@@ -82,6 +82,17 @@ nav button.active{color:var(--accent)}
 .card-body{display:none;border-top:1px solid var(--line);padding:6px 15px 14px}
 .card.open .card-body{display:block}
 .done-tag{font-size:11px;font-weight:700;color:var(--ok);font-family:'Barlow Condensed';text-transform:uppercase}
+.fail-tag{font-size:11px;font-weight:700;color:#e0594e;font-family:'Barlow Condensed';text-transform:uppercase}
+/* Resultado conseguido / fallo */
+.outcome{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0 2px;flex-wrap:wrap}
+.out-q{font-size:13px;color:var(--muted);font-weight:600}
+.out-btns{display:flex;gap:8px}
+.out-btn{font-family:'Barlow Condensed';font-weight:700;font-size:14px;padding:8px 14px;border-radius:9px;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--muted)}
+.out-btn.ok.sel{background:var(--ok);border-color:var(--ok);color:#0c140f}
+.out-btn.no.sel{background:#e0594e;border-color:#e0594e;color:#1a0a08}
+.fail-detail{margin-top:8px;padding:10px;background:rgba(224,89,78,.08);border:1px solid rgba(224,89,78,.3);border-radius:10px}
+.fail-detail label{display:block;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:5px}
 
 /* ---- Series ---- */
 .set-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--surface-2)}
@@ -329,11 +340,39 @@ function occurrences(day, s){
 }
 function appearsIn(day,s){ const isA = s%2===1; return day==='AB' || (day==='A'&&isA) || (day==='B'&&!isA); }
 
+/* ¿Falló este ejercicio en la sesión s? (presencia de clave en lg.fail) */
+function liftFailed(s, liftKey){ const lg=S.logs[s]; return !!(lg && lg.fail && (liftKey in lg.fail)); }
+/* Éxitos registrados de un ejercicio en sesiones ANTERIORES a s */
+function successesBefore(liftKey, s){
+  const day=LIFTS[liftKey].day; let n=0;
+  for(let p=1;p<s;p++){ if(!appearsIn(day,p)) continue; if(sessionLogged(p) && !liftFailed(p,liftKey)) n++; }
+  return n;
+}
+/* Total de éxitos registrados (en todo el historial) */
+function totalSuccesses(liftKey){
+  const day=LIFTS[liftKey].day; let n=0;
+  for(const p of Object.keys(S.logs).map(Number)){ if(appearsIn(day,p) && sessionLogged(p) && !liftFailed(p,liftKey)) n++; }
+  return n;
+}
+/* Nº de apariciones del ejercicio en [desde, hasta) */
+function appearancesBetween(liftKey, desde, hasta){
+  const day=LIFTS[liftKey].day; let n=0;
+  for(let p=desde;p<hasta;p++) if(appearsIn(day,p)) n++;
+  return n;
+}
+
+/* PESO DE TRABAJO — ya no depende del nº de sesión, sino de tus resultados:
+   peso = inicial + incremento × (nº de veces que LO CONSEGUISTE antes).
+   Si fallas, no cuentas ese éxito → repites el mismo peso la próxima vez.
+   Para sesiones futuras (aún sin registrar) se proyecta asumiendo éxito. */
 function workWeight(liftKey, s){
   const L=LIFTS[liftKey];
-  const n=occurrences(L.day, s);
-  if(n<=0) return null;
-  return startWork(liftKey) + (n-1)*L.inc;
+  if(!appearsIn(L.day, s)) return null;
+  const frontier = lastCompletedSession()+1;   // próxima sesión pendiente
+  let exitos;
+  if(s<=frontier) exitos = successesBefore(liftKey, s);                                  // real
+  else exitos = totalSuccesses(liftKey) + appearancesBetween(liftKey, frontier, s);      // proyección optimista
+  return startWork(liftKey) + exitos*L.inc;
 }
 
 // Rampa de calentamiento según tipo (porcentajes del Excel)
@@ -387,7 +426,7 @@ function barbellHTML(target){
 }
 
 /* ---------- 5) Helpers de log ---------- */
-function logFor(s){ if(!S.logs[s]) S.logs[s]={sets:{}, acc:{}, failed:[], date:null}; return S.logs[s]; }
+function logFor(s){ if(!S.logs[s]) S.logs[s]={sets:{}, acc:{}, fail:{}, date:null}; if(!S.logs[s].fail) S.logs[s].fail={}; return S.logs[s]; }
 function setKey(liftKey,i){ return liftKey+'_'+i; }
 function toggleSet(s,liftKey,i){
   const lg=logFor(s); const k=setKey(liftKey,i);
@@ -449,7 +488,7 @@ function renderOnboarding(){
 /* ---- HOY ---- */
 function renderHoy(){
   const ses=buildSession(S.current);
-  const lg=S.logs[S.current]||{sets:{},acc:{},failed:[]};
+  const lg=S.logs[S.current]||{sets:{},acc:{},fail:{}};
   app.innerHTML=`
     <p class="eyebrow">Sesión ${S.current} · Entrenamiento ${ses.day}</p>
     <h2 class="h-big" style="font-size:26px;margin-bottom:14px">${ses.day==='A'?'Sentadilla · Banca · Peso muerto':'Sentadilla · Militar · Clean'}</h2>
@@ -486,13 +525,14 @@ function renderHoy(){
 function liftCard(L,lg){
   const div=document.createElement('div'); div.className='card';
   const allDone=L.sets.every((_,i)=>lg.sets[setKey(L.key,i)]);
-  if(allDone) div.classList.add('open');
+  const failed=!!(lg.fail && (L.key in lg.fail));
+  if(allDone||failed) div.classList.add('open');
   div.innerHTML=`
     <div class="card-head">
       <div class="left"><span class="ex-name">${L.label}</span></div>
       <div style="display:flex;align-items:center;gap:10px">
         <span class="ex-scheme">${L.scheme} · ${L.W} kg</span>
-        ${allDone?'<span class="done-tag">✓ Hecho</span>':''}
+        ${failed?'<span class="fail-tag">✗ Fallo</span>':(allDone?'<span class="done-tag">✓ Hecho</span>':'')}
         <span class="chev">▶</span>
       </div>
     </div>
@@ -504,6 +544,18 @@ function liftCard(L,lg){
           <button class="tick ${lg.sets[setKey(L.key,i)]?'on':''}" data-lift="${L.key}" data-i="${i}" data-work="${st.work?1:0}">✓</button>
         </div>`).join('')}
       ${barbellHTML(L.W)}
+      <div class="outcome">
+        <span class="out-q">¿Conseguiste el objetivo (${L.W} kg)?</span>
+        <div class="out-btns">
+          <button class="out-btn ok ${failed?'':'sel'}" data-out="ok" data-lift="${L.key}">✓ Sí</button>
+          <button class="out-btn no ${failed?'sel':''}" data-out="fail" data-lift="${L.key}">✗ Fallé</button>
+        </div>
+      </div>
+      <div class="fail-detail ${failed?'':'hidden'}" data-faildetail="${L.key}">
+        <label>Detalle del fallo (opcional)</label>
+        <textarea rows="2" data-failnote="${L.key}" placeholder="p. ej. me quedé en la 3ª rep de la última serie">${failed?(lg.fail[L.key]||''):''}</textarea>
+        <p class="tiny" style="margin-top:4px">La próxima vez <b>repetirás ${L.W} kg</b>, no subirás.</p>
+      </div>
       <div class="help"><b>Claves de técnica:</b> ${LIFTS[L.key].cues.join(' · ')}
         <br><span class="pageref">📖 Barra Libre · pág. ${L.page} — repásalo si tienes dudas</span></div>
       <div class="field" style="margin-top:10px"><label>Tus notas</label>
@@ -518,6 +570,21 @@ function liftCard(L,lg){
     t.classList.toggle('on');
     if(turningOn && t.dataset.work==='1') startRest();   // descanso tras serie de trabajo
   });
+  // resultado conseguido / fallo
+  div.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>{
+    const lk=b.dataset.lift, out=b.dataset.out;
+    const log=logFor(S.current);
+    if(out==='fail'){ if(!(lk in log.fail)) log.fail[lk]=''; }
+    else { delete log.fail[lk]; }
+    save();
+    div.querySelector('[data-out="ok"]').classList.toggle('sel', out==='ok');
+    div.querySelector('[data-out="fail"]').classList.toggle('sel', out==='fail');
+    div.querySelector('[data-faildetail]').classList.toggle('hidden', out!=='fail');
+    const head=div.querySelector('.card-head > div:last-child');
+    const old=head.querySelector('.fail-tag,.done-tag'); if(old) old.remove();
+    if(out==='fail'){ const sp=document.createElement('span'); sp.className='fail-tag'; sp.textContent='✗ Fallo'; head.insertBefore(sp, head.querySelector('.chev')); }
+  });
+  div.querySelector('[data-failnote]').addEventListener('change',e=>{ const log=logFor(S.current); log.fail[L.key]=e.target.value; save(); });
   div.querySelector('[data-note]').addEventListener('change',e=>{ S.notes[L.key]=e.target.value; save(); });
   return div;
 }
@@ -615,7 +682,7 @@ function histStrength({s,date}){
       <span class="ex-name" style="font-size:17px">Sesión ${s} · Día ${ses.day}</span></div>
       <span class="ex-scheme">${date}${sessionDone(s)?' · ✓':''} <span class="chev">▶</span></span></div>
     <div class="card-body">
-      ${ses.lifts.map(L=>`<div class="stat-line">${L.label}<b>${L.W} kg</b></div>`).join('')}
+      ${ses.lifts.map(L=>`<div class="stat-line">${L.label}${liftFailed(s,L.key)?' <span class="fail-tag">✗ fallo</span>':''}<b>${L.W} kg</b></div>`).join('')}
       <div class="field" style="margin-top:12px"><label>Fecha</label><input type="date" data-date="${s}" value="${date}"></div>
       <div class="btn-row">
         <button class="btn ghost" data-edit="${s}">Editar series</button>
