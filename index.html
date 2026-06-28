@@ -93,6 +93,22 @@ nav button.active{color:var(--accent)}
 .out-btn.no.sel{background:#e0594e;border-color:#e0594e;color:#1a0a08}
 .fail-detail{margin-top:8px;padding:10px;background:rgba(224,89,78,.08);border:1px solid rgba(224,89,78,.3);border-radius:10px}
 .fail-detail label{display:block;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:5px}
+.mid-tag{font-size:11px;font-weight:700;color:#e0b020;font-family:'Barlow Condensed';text-transform:uppercase}
+/* Resultado de 3 estados */
+.outcome3-wrap{margin:12px 0 2px}
+.out-q{font-size:13px;color:var(--muted);font-weight:600;display:block;margin-bottom:8px}
+.outcome3{display:flex;gap:7px}
+.o3{flex:1;font-family:'Barlow Condensed';font-weight:700;font-size:14px;padding:11px 6px;border-radius:9px;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--muted);cursor:pointer;text-align:center}
+.o3.ok.sel{background:var(--ok);border-color:var(--ok);color:#0c140f}
+.o3.mid.sel{background:#e0b020;border-color:#e0b020;color:#1a1405}
+.o3.no.sel{background:#e0594e;border-color:#e0594e;color:#1a0a08}
+.o3-next{margin-top:9px;font-size:13px;color:var(--muted);background:var(--surface-2);border-radius:8px;padding:8px 11px}
+.o3-next b{color:var(--warm)}
+.o3-note{margin-top:8px}
+.o3-note textarea{width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px;font-size:15px;font-family:inherit}
+.stall-note{background:rgba(224,89,78,.1);border:1px solid rgba(224,89,78,.35);border-radius:9px;padding:10px 12px;font-size:13px;color:var(--warm);margin:8px 0}
+.stall-note b{color:#e0594e}
 
 /* ---- Series ---- */
 .set-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--surface-2)}
@@ -168,7 +184,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:18px 0}
   display:none;align-items:center;justify-content:center;padding:24px}
 .modal.show{display:flex}
 .modal-box{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px;max-width:340px;width:100%}
-.modal-box p{margin:0 0 18px;font-size:15px}
+.modal-box p{margin:0 0 18px;font-size:15px;white-space:pre-line;text-align:left}
 .modal-box .btn-row{margin:0}
 /* Temporizador de descanso flotante */
 .rest-pill{position:fixed;left:50%;bottom:78px;transform:translateX(-50%) translateY(20px);z-index:40;
@@ -298,7 +314,7 @@ const DEFAULTS = {
   minInc: 2.5,      // base de redondeo = salto mínimo cargable (1.25 kg/lado)
   descarga: 0.10,   // % descarga inicial sobre el 5RM
   bar: 20,          // peso de la barra (kg)
-  plates: [20,10,5,2.5,1.25], // discos disponibles por lado (kg)
+  plates: [20,10,5,2.5,1.25,1,0.5], // discos disponibles por lado (kg)
   restSec: 120,     // descanso entre series (segundos)
   planStart: null,  // fecha (ISO) del primer entrenamiento, para el calendario
   nutri: {},        // datos para la calculadora de nutrición (edad, altura, peso, grasa)
@@ -369,15 +385,29 @@ function save(){ localStorage.setItem(KEY, JSON.stringify(S)); }
 const floorTo=(x,s)=>Math.floor(x/s)*s;
 const round=(x)=>Math.round(x); // JS redondea .5 hacia arriba, igual que el Excel
 
-// Ajusta cualquier peso al más cercano que SÍ puedas montar con tus discos.
-// (con discos 20/10/5/2.5/1.25 el salto total mínimo es 2.5 kg)
+// Conjunto de pesos por lado alcanzables con tus discos (knapsack ilimitado, rejilla 0,25)
+let _reachCache=null,_reachKey='';
+function reachable(){
+  const key=S.cfg.plates.join(',');
+  if(_reachKey===key&&_reachCache) return _reachCache;
+  const step=0.25, N=Math.round(200/step)+1, r=new Array(N).fill(false); r[0]=true;
+  S.cfg.plates.filter(p=>p>0).forEach(p=>{ const pi=Math.round(p/step); if(pi>0) for(let i=pi;i<N;i++) if(r[i-pi]) r[i]=true; });
+  _reachCache=r; _reachKey=key; return r;
+}
+function isLoadable(w){
+  const bar=S.cfg.bar; if(w<bar-1e-9) return false;
+  const per=(w-bar)/2, idxf=per/0.25, idx=Math.round(idxf);
+  if(Math.abs(idxf-idx)>1e-6) return false;      // no cae en la rejilla
+  const r=reachable(); return idx>=0&&idx<r.length&&r[idx];
+}
+// Ajusta cualquier peso al cargable más cercano con tus discos reales.
 function nearestLoadable(target){
-  const bar=S.cfg.bar;
-  if(target<=bar) return bar;
-  const ps=[...S.cfg.plates].filter(p=>p>0);
-  if(!ps.length) return target;
-  const step=Math.min(...ps)*2;          // menor incremento total posible
-  return bar + Math.round((target-bar)/step)*step;
+  const bar=S.cfg.bar; if(target<=bar) return bar;
+  for(let d=0; d<=20.0001; d+=0.25){
+    if(isLoadable(target-d)) return Math.round((target-d)*100)/100;
+    if(isLoadable(target+d)) return Math.round((target+d)*100)/100;
+  }
+  return Math.round(target*2)/2;
 }
 
 function startWork(liftKey){
@@ -392,19 +422,17 @@ function occurrences(day, s){
 }
 function appearsIn(day,s){ const isA = s%2===1; return day==='AB' || (day==='A'&&isA) || (day==='B'&&!isA); }
 
-/* ¿Falló este ejercicio en la sesión s? (presencia de clave en lg.fail) */
-function liftFailed(s, liftKey){ const lg=S.logs[s]; return !!(lg && lg.fail && (liftKey in lg.fail)); }
-/* Éxitos registrados de un ejercicio en sesiones ANTERIORES a s */
-function successesBefore(liftKey, s){
-  const day=LIFTS[liftKey].day; let n=0;
-  for(let p=1;p<s;p++){ if(!appearsIn(day,p)) continue; if(sessionLogged(p) && !liftFailed(p,liftKey)) n++; }
-  return n;
-}
-/* Total de éxitos registrados (en todo el historial) */
-function totalSuccesses(liftKey){
-  const day=LIFTS[liftKey].day; let n=0;
-  for(const p of Object.keys(S.logs).map(Number)){ if(appearsIn(day,p) && sessionLogged(p) && !liftFailed(p,liftKey)) n++; }
-  return n;
+/* ¿Falló este ejercicio en la sesión s? */
+function liftFailed(s, liftKey){ const o=S.logs[s]&&S.logs[s].out&&S.logs[s].out[liftKey]; return !!(o&&o.r==='fallo'); }
+/* Incremento ganado en una sesión registrada, según el resultado (regla del libro):
+   limpio = incremento completo · forzado = mitad · fallo = 0 (repite peso) */
+function incEarned(liftKey, p){
+  const L=LIFTS[liftKey];
+  const o=S.logs[p]&&S.logs[p].out&&S.logs[p].out[liftKey];
+  const r=o?o.r:'limpio';                 // registrada sin marcar = se considera limpio
+  if(r==='fallo') return 0;
+  if(r==='forzado') return L.inc/2;
+  return L.inc;
 }
 /* Nº de apariciones del ejercicio en [desde, hasta) */
 function appearancesBetween(liftKey, desde, hasta){
@@ -412,19 +440,26 @@ function appearancesBetween(liftKey, desde, hasta){
   for(let p=desde;p<hasta;p++) if(appearsIn(day,p)) n++;
   return n;
 }
+/* Fallos consecutivos más recientes (para detectar estancamiento) */
+function consecutiveFails(liftKey){
+  const day=LIFTS[liftKey].day, apps=[];
+  for(let p=1;p<=TOTAL_SESSIONS;p++) if(appearsIn(day,p)&&sessionLogged(p)) apps.push(p);
+  let c=0; for(let i=apps.length-1;i>=0;i--){ if(liftFailed(apps[i],liftKey)) c++; else break; }
+  return c;
+}
 
-/* PESO DE TRABAJO — ya no depende del nº de sesión, sino de tus resultados:
-   peso = inicial + incremento × (nº de veces que LO CONSEGUISTE antes).
-   Si fallas, no cuentas ese éxito → repites el mismo peso la próxima vez.
-   Para sesiones futuras (aún sin registrar) se proyecta asumiendo éxito. */
+/* PESO DE TRABAJO — parte del peso inicial y SUMA el incremento ganado en cada
+   sesión registrada anterior (completo, medio o cero según el resultado).
+   Para sesiones futuras se proyecta asumiendo "limpio". */
 function workWeight(liftKey, s){
   const L=LIFTS[liftKey];
   if(!appearsIn(L.day, s)) return null;
-  const frontier = lastCompletedSession()+1;   // próxima sesión pendiente
-  let exitos;
-  if(s<=frontier) exitos = successesBefore(liftKey, s);                                  // real
-  else exitos = totalSuccesses(liftKey) + appearancesBetween(liftKey, frontier, s);      // proyección optimista
-  return startWork(liftKey) + exitos*L.inc;
+  const frontier = lastCompletedSession()+1;
+  let w=startWork(liftKey);
+  const upto = (s<=frontier) ? s : frontier;
+  for(let p=1;p<upto;p++) if(appearsIn(L.day,p)&&sessionLogged(p)) w+=incEarned(liftKey,p);
+  if(s>frontier) w += appearancesBetween(liftKey, frontier, s)*L.inc; // proyección optimista
+  return w;
 }
 
 // Rampa de calentamiento según tipo (porcentajes del Excel)
@@ -478,7 +513,9 @@ function barbellHTML(target){
 }
 
 /* ---------- 5) Helpers de log ---------- */
-function logFor(s){ if(!S.logs[s]) S.logs[s]={sets:{}, acc:{}, fail:{}, notes:{}, date:null}; const l=S.logs[s]; if(!l.fail)l.fail={}; if(!l.notes)l.notes={}; return l; }
+function logFor(s){ if(!S.logs[s]) S.logs[s]={sets:{}, acc:{}, out:{}, notes:{}, date:null}; const l=S.logs[s]; if(!l.out)l.out={}; if(!l.notes)l.notes={};
+  if(l.fail){ for(const k in l.fail){ if(!l.out[k]) l.out[k]={r:'fallo', note:l.fail[k]||''}; } delete l.fail; } // migra formato antiguo
+  return l; }
 function setKey(liftKey,i){ return liftKey+'_'+i; }
 function toggleSet(s,liftKey,i){
   const lg=logFor(s); const k=setKey(liftKey,i);
@@ -585,7 +622,7 @@ function renderHoy(){
   } else {
     // ----- DÍA DE FUERZA -----
     const ses=buildSession(S.current);
-    const lg=S.logs[S.current]||{sets:{},acc:{},fail:{},notes:{}};
+    const lg=S.logs[S.current]||{sets:{},acc:{},out:{},notes:{}};
     app.innerHTML=`${toggle}
       <p class="eyebrow">Sesión ${S.current} · Entrenamiento ${ses.day}</p>
       <h2 class="h-big" style="font-size:26px;margin-bottom:14px">${ses.day==='A'?'Sentadilla · Banca · Peso muerto':'Sentadilla · Militar · Clean'}</h2>
@@ -604,15 +641,29 @@ function renderHoy(){
     ses.accessories.forEach(a=>acc.appendChild(accCard(a,lg)));
     document.getElementById('prevBtn').onclick=()=>{ if(S.current>1){S.current--;save();renderHoy();} };
     document.getElementById('doneBtn').onclick=()=>{
-      const l=logFor(S.current);
-      l.date ||= new Date().toISOString().slice(0,10);
-      if(S.current===1 && !S.cfg.planStart) S.cfg.planStart=l.date; // ancla el calendario
-      const wasLast = S.current>=TOTAL_SESSIONS;
-      recomputeCurrent(); save();
-      const nt2=nextTraining();
-      hoyMode = (nt2.type==='hiit') ? 'hiit' : 'fuerza';   // si toca HIIT, sugiérelo
-      renderHoy(); window.scrollTo(0,0);
-      toast(wasLast ? '¡Fase I completada! 🎉' : (nt2.type==='hiit'?'Fuerza guardada · ahora toca HIIT':'Sesión guardada'));
+      const s=S.current, sesNow=buildSession(s), log=logFor(s);
+      const afectados=sesNow.lifts.filter(L=>{ const o=log.out[L.key]; return o&&(o.r==='forzado'||o.r==='fallo'); });
+      const guardar=()=>{
+        const l=logFor(s);
+        l.date ||= new Date().toISOString().slice(0,10);
+        if(s===1 && !S.cfg.planStart) S.cfg.planStart=l.date; // ancla el calendario
+        const wasLast = s>=TOTAL_SESSIONS;
+        recomputeCurrent(); save();
+        const nt2=nextTraining();
+        hoyMode = (nt2.type==='hiit') ? 'hiit' : 'fuerza';   // si toca HIIT, sugiérelo
+        renderHoy(); window.scrollTo(0,0);
+        toast(wasLast ? '¡Fase I completada! 🎉' : (nt2.type==='hiit'?'Fuerza guardada · ahora toca HIIT':'Sesión guardada'));
+      };
+      if(afectados.length){
+        let msg='Vas a guardar el día con estos resultados:\n\n';
+        afectados.forEach(L=>{
+          const o=log.out[L.key];
+          if(o.r==='fallo') msg+=`• ${L.label} — FALLO: la próxima vez repites ${L.W} kg (no subes)\n`;
+          else { const nw=nearestLoadable(L.W+LIFTS[L.key].inc/2); msg+=`• ${L.label} — FORZADO: la próxima vez +${+(nw-L.W).toFixed(2)} kg → ${nw} kg\n`; }
+        });
+        msg+='\nEsto se aplicará a partir de ahora. ¿Guardar?';
+        askConfirm(msg, guardar, 'Guardar');
+      } else guardar();
     };
   }
   // selector de día (común a ambos modos)
@@ -622,14 +673,15 @@ function renderHoy(){
 function liftCard(L,lg){
   const div=document.createElement('div'); div.className='card';
   const allDone=L.sets.every((_,i)=>lg.sets[setKey(L.key,i)]);
-  const failed=!!(lg.fail && (L.key in lg.fail));
-  if(allDone||failed) div.classList.add('open');
+  const oc=(lg.out&&lg.out[L.key])||{}; const r=oc.r||'';
+  const stalled=consecutiveFails(L.key)>=3;
+  if(allDone||r) div.classList.add('open');
   div.innerHTML=`
     <div class="card-head">
       <div class="left"><span class="ex-name">${L.label}</span></div>
       <div style="display:flex;align-items:center;gap:10px">
         <span class="ex-scheme">${L.scheme} · ${L.W} kg</span>
-        ${failed?'<span class="fail-tag">✗ Fallo</span>':(allDone?'<span class="done-tag">✓ Hecho</span>':'')}
+        ${outcomeBadge(r,allDone)}
         <span class="chev">▶</span>
       </div>
     </div>
@@ -641,17 +693,18 @@ function liftCard(L,lg){
           <button class="tick ${lg.sets[setKey(L.key,i)]?'on':''}" data-lift="${L.key}" data-i="${i}" data-work="${st.work?1:0}">✓</button>
         </div>`).join('')}
       ${barbellHTML(L.W)}
-      <div class="outcome">
-        <span class="out-q">¿Conseguiste el objetivo (${L.W} kg)?</span>
-        <div class="out-btns">
-          <button class="out-btn ok ${failed?'':'sel'}" data-out="ok" data-lift="${L.key}">✓ Sí</button>
-          <button class="out-btn no ${failed?'sel':''}" data-out="fail" data-lift="${L.key}">✗ Fallé</button>
+      ${stalled?`<div class="stall-note">⚠️ Llevas 3 fallos seguidos en ${L.label}: estás <b>estancado</b>. Toca <b>descarga</b> (la añadimos en el siguiente paso).</div>`:''}
+      <div class="outcome3-wrap">
+        <span class="out-q">¿Cómo te fue con ${L.W} kg?</span>
+        <div class="outcome3">
+          <button class="o3 ok ${(r===''||r==='limpio')?'sel':''}" data-r="limpio" data-lift="${L.key}">✅ Limpio</button>
+          <button class="o3 mid ${r==='forzado'?'sel':''}" data-r="forzado" data-lift="${L.key}">🟡 Forzado</button>
+          <button class="o3 no ${r==='fallo'?'sel':''}" data-r="fallo" data-lift="${L.key}">❌ Fallo</button>
         </div>
-      </div>
-      <div class="fail-detail ${failed?'':'hidden'}" data-faildetail="${L.key}">
-        <label>Detalle del fallo (opcional)</label>
-        <textarea rows="2" data-failnote="${L.key}" placeholder="p. ej. me quedé en la 3ª rep de la última serie">${failed?(lg.fail[L.key]||''):''}</textarea>
-        <p class="tiny" style="margin-top:4px">La próxima vez <b>repetirás ${L.W} kg</b>, no subirás.</p>
+        <div class="o3-next" data-next="${L.key}">${nextPreview(L.key, r||'limpio', L.W)}</div>
+        <div class="o3-note ${(r==='forzado'||r==='fallo')?'':'hidden'}" data-notewrap="${L.key}">
+          <textarea rows="2" data-outnote="${L.key}" placeholder="Detalle (opcional): p. ej. me quedé en la 3ª rep de la última serie">${oc.note||''}</textarea>
+        </div>
       </div>
       <div class="help"><b>Claves de técnica:</b> ${LIFTS[L.key].cues.join(' · ')}
         <br><span class="pageref">📖 Barra Libre · pág. ${L.page} — repásalo si tienes dudas</span></div>
@@ -665,25 +718,38 @@ function liftCard(L,lg){
     const turningOn=!t.classList.contains('on');
     toggleSet(S.current,t.dataset.lift,parseInt(t.dataset.i));
     t.classList.toggle('on');
-    if(turningOn && t.dataset.work==='1') startRest();   // descanso tras serie de trabajo
+    if(turningOn && t.dataset.work==='1') startRest();
   });
-  // resultado conseguido / fallo
-  div.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>{
-    const lk=b.dataset.lift, out=b.dataset.out;
-    const log=logFor(S.current);
-    if(out==='fail'){ if(!(lk in log.fail)) log.fail[lk]=''; }
-    else { delete log.fail[lk]; }
-    save();
-    div.querySelector('[data-out="ok"]').classList.toggle('sel', out==='ok');
-    div.querySelector('[data-out="fail"]').classList.toggle('sel', out==='fail');
-    div.querySelector('[data-faildetail]').classList.toggle('hidden', out!=='fail');
-    const head=div.querySelector('.card-head > div:last-child');
-    const old=head.querySelector('.fail-tag,.done-tag'); if(old) old.remove();
-    if(out==='fail'){ const sp=document.createElement('span'); sp.className='fail-tag'; sp.textContent='✗ Fallo'; head.insertBefore(sp, head.querySelector('.chev')); }
+  // resultado: limpio / forzado / fallo (provisional hasta guardar la sesión)
+  div.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{
+    applyOutcome(div, b.dataset.lift, b.dataset.r, L.W);
   });
-  div.querySelector('[data-failnote]').addEventListener('change',e=>{ const log=logFor(S.current); log.fail[L.key]=e.target.value; save(); });
+  div.querySelector('[data-outnote]').addEventListener('change',e=>{ const log=logFor(S.current); log.out[L.key]=log.out[L.key]||{r:'limpio'}; log.out[L.key].note=e.target.value; save(); });
   div.querySelector('[data-note]').addEventListener('change',e=>{ const log=logFor(S.current); log.notes[L.key]=e.target.value; save(); });
   return div;
+}
+function outcomeBadge(r,allDone){
+  if(r==='fallo') return '<span class="fail-tag">❌ Fallo</span>';
+  if(r==='forzado') return '<span class="mid-tag">🟡 Forzado</span>';
+  if(r==='limpio'||allDone) return '<span class="done-tag">✓ Limpio</span>';
+  return '';
+}
+function nextPreview(lift, r, curW){
+  const inc=LIFTS[lift].inc;
+  if(r==='fallo') return `Si lo guardas así · próxima vez: <b>mismo peso, ${curW} kg</b> (lo repites)`;
+  const delta=(r==='forzado')?inc/2:inc;
+  const nextW=nearestLoadable(curW+delta);
+  return `Si lo guardas así · próxima vez: <b>+${+(nextW-curW).toFixed(2)} kg → ${nextW} kg</b>${r==='forzado'?' (medio incremento)':''}`;
+}
+function applyOutcome(div, lk, r, curW){
+  const log=logFor(S.current); log.out[lk]={...(log.out[lk]||{}), r}; save();
+  div.querySelectorAll('[data-r]').forEach(x=>x.classList.toggle('sel', x.dataset.r===r));
+  const nx=div.querySelector('[data-next]'); if(nx) nx.innerHTML=nextPreview(lk,r,curW);
+  const nw=div.querySelector('[data-notewrap]'); if(nw) nw.classList.toggle('hidden', !(r==='forzado'||r==='fallo'));
+  const head=div.querySelector('.card-head > div:last-child');
+  const old=head.querySelector('.fail-tag,.done-tag,.mid-tag'); if(old) old.remove();
+  const chev=head.querySelector('.chev'); const badge=outcomeBadge(r,false);
+  if(badge && chev) chev.insertAdjacentHTML('beforebegin', badge);
 }
 
 function accCard(a,lg){
