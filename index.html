@@ -199,6 +199,52 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:18px 0}
 .cal-legend .lg.f{background:rgba(255,107,26,.45)}
 .cal-legend .lg.h{background:rgba(255,179,122,.4)}
 .cal-legend .lg.tdy{outline:2px solid var(--accent);outline-offset:-2px;background:transparent}
+/* Nav: 6 pestañas */
+nav button{font-size:10px}
+nav button .ic{font-size:18px}
+/* ===== Nutrición ===== */
+.pyramid{display:flex;flex-direction:column;gap:4px;margin:6px 0 4px}
+.pyr-row{display:flex;align-items:center;gap:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px}
+.pyr-row .lvl{font-family:'Barlow Condensed';font-weight:700;color:var(--accent);font-size:13px;min-width:96px;text-transform:uppercase}
+.pyr-row small{color:var(--muted);font-size:12px}
+.note{background:var(--surface-2);border-left:3px solid var(--accent);border-radius:8px;padding:11px 13px;font-size:13.5px;color:var(--muted);margin:10px 0}
+.note b{color:var(--text)}
+.note.warn{border-left-color:#e0594e}
+.lead{color:var(--muted);margin-bottom:14px}
+.sub2{font-family:'Barlow Condensed';font-weight:700;font-size:20px;text-transform:uppercase;margin:22px 0 8px;color:var(--warm)}
+.calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.res-block{margin-top:16px;border-top:1px solid var(--line);padding-top:6px}
+.res-row{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--surface-2)}
+.res-row:last-child{border:none}
+.res-row .rn{font-weight:600;font-size:14px}
+.res-row .rn small{display:block;color:var(--faint);font-weight:500;font-size:11.5px}
+.res-row .kcal{font-family:'Barlow Condensed';font-weight:800;font-size:21px;color:var(--warm)}
+.res-row .macros{font-family:'Barlow Condensed';font-weight:600;font-size:13px;color:var(--muted);text-align:right;min-width:118px}
+.ntabs{display:flex;gap:6px;overflow-x:auto;margin:0 0 14px;padding-bottom:4px}
+.ntabs button{flex:none;font-family:'Barlow Condensed';font-weight:700;font-size:13px;padding:8px 12px;border-radius:9px;
+  background:var(--surface);border:1px solid var(--line);color:var(--muted);text-transform:uppercase;white-space:nowrap}
+.ntabs button.sel{background:var(--accent);border-color:var(--accent);color:#160a02}
+.phase{display:none}.phase.show{display:block}
+.tag{display:inline-block;font-family:'Barlow Condensed';font-weight:700;font-size:11px;text-transform:uppercase;padding:3px 9px;border-radius:999px;margin:0 5px 5px 0}
+.tag.bloc{background:rgba(255,107,26,.16);color:var(--warm);border:1px solid rgba(255,107,26,.4)}
+.tag.sup{background:rgba(63,174,106,.14);color:#7fd6a0;border:1px solid rgba(63,174,106,.35)}
+.kv{display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--surface-2);font-size:14px}
+.kv:last-child{border:none}
+.kv .k{font-weight:600;min-width:104px;color:var(--warm)}
+.macro-pill{display:inline-flex;gap:5px;align-items:baseline;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin:3px 5px 3px 0;font-size:13px}
+.macro-pill b{font-family:'Barlow Condensed';color:var(--warm);font-size:15px}
+.foodcol{margin:10px 0}
+.foodcol .lbl{font-family:'Barlow Condensed';font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;display:flex;align-items:center;gap:6px}
+.fdot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.fdot.ok{background:var(--ok)}.fdot.mod{background:#e0b020}.fdot.no{background:#e0594e}
+.foodcol .items{font-size:13.5px;color:var(--muted);line-height:1.7}
+/* Selector de día Fuerza / HIIT */
+.day-toggle{display:flex;gap:6px;margin-bottom:16px;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:5px}
+.day-toggle .dt{flex:1;font-family:'Barlow Condensed';font-weight:700;font-size:16px;text-transform:uppercase;
+  padding:11px;border-radius:9px;background:transparent;color:var(--muted);border:none;cursor:pointer;letter-spacing:.03em}
+.day-toggle .dt.sel{background:var(--accent);color:#160a02}
+.pdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warm);vertical-align:middle;margin-left:2px}
+.day-toggle .dt.sel .pdot{background:#160a02}
 </style>
 </head>
 <body>
@@ -215,6 +261,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:18px 0}
   <button data-view="calendario"><span class="ic">🗓️</span>Plan</button>
   <button data-view="historial"><span class="ic">📋</span>Historial</button>
   <button data-view="progreso"><span class="ic">📈</span>Progreso</button>
+  <button data-view="nutricion"><span class="ic">🥩</span>Dieta</button>
   <button data-view="ajustes"><span class="ic">⚙️</span>Ajustes</button>
 </nav>
 
@@ -254,6 +301,7 @@ const DEFAULTS = {
   plates: [20,10,5,2.5,1.25], // discos disponibles por lado (kg)
   restSec: 120,     // descanso entre series (segundos)
   planStart: null,  // fecha (ISO) del primer entrenamiento, para el calendario
+  nutri: {},        // datos para la calculadora de nutrición (edad, altura, peso, grasa)
   rm: { sentadilla:80, banca:50, peso_muerto:100, militar:30, clean:30 }
 };
 
@@ -301,11 +349,15 @@ const TOTAL_SESSIONS = 24;
 const WEEKS = 8;
 const weekOf = s => Math.ceil(s/3);            // 3 sesiones de fuerza por semana
 const hiitOfWeek = w => ((w-1)%4)+1;           // rota HIIT 1→2→3→4→1...
+// Semana de HIIT a mostrar: la de la ÚLTIMA fuerza completada (el HIIT va al
+// final del microciclo, después de las 3 sesiones de fuerza de esa semana).
+function currentHiitWeek(){ return Math.min(WEEKS, Math.max(1, weekOf(lastCompletedSession()))); }
 
 /* ---------- 2) Estado persistente (localStorage) ---------- */
 const KEY='barralibre_v1';
 let S = load();
 if(!S.hiit) S.hiit={};   // migración para guardados anteriores
+if(!S.cfg.nutri) S.cfg.nutri={};
 if(lastCompletedSession()===0) S.current=1;  // sin historial -> empezar en Sesión 1 (día A)
 function load(){
   try{ const r=JSON.parse(localStorage.getItem(KEY)); if(r&&r.cfg) return r; }catch(e){}
@@ -426,7 +478,7 @@ function barbellHTML(target){
 }
 
 /* ---------- 5) Helpers de log ---------- */
-function logFor(s){ if(!S.logs[s]) S.logs[s]={sets:{}, acc:{}, fail:{}, date:null}; if(!S.logs[s].fail) S.logs[s].fail={}; return S.logs[s]; }
+function logFor(s){ if(!S.logs[s]) S.logs[s]={sets:{}, acc:{}, fail:{}, notes:{}, date:null}; const l=S.logs[s]; if(!l.fail)l.fail={}; if(!l.notes)l.notes={}; return l; }
 function setKey(liftKey,i){ return liftKey+'_'+i; }
 function toggleSet(s,liftKey,i){
   const lg=logFor(s); const k=setKey(liftKey,i);
@@ -459,6 +511,7 @@ function render(){
   else if(view==='calendario') renderCalendario();
   else if(view==='historial') renderHistorial();
   else if(view==='progreso') renderProgreso();
+  else if(view==='nutricion') renderNutricion();
   else renderAjustes();
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
 }
@@ -486,40 +539,84 @@ function renderOnboarding(){
 }
 
 /* ---- HOY ---- */
-function renderHoy(){
-  const ses=buildSession(S.current);
-  const lg=S.logs[S.current]||{sets:{},acc:{},fail:{}};
-  app.innerHTML=`
-    <p class="eyebrow">Sesión ${S.current} · Entrenamiento ${ses.day}</p>
-    <h2 class="h-big" style="font-size:26px;margin-bottom:14px">${ses.day==='A'?'Sentadilla · Banca · Peso muerto':'Sentadilla · Militar · Clean'}</h2>
-    <div id="lifts"></div>
-    <hr class="sep">
-    <p class="eyebrow">Accesorios</p>
-    <div id="acc"></div>
-    <hr class="sep">
-    <p class="eyebrow">HIIT de la semana ${weekOf(S.current)}</p>
-    <div id="hiit"></div>
-    <div class="btn-row">
-      <button class="btn ghost" id="prevBtn">‹ Anterior</button>
-      <button class="btn" id="doneBtn">Completar sesión ›</button>
-    </div>
-    <p class="tiny center">El peso de cada sesión ya está calculado. Marca las series que completes.</p>
-  `;
-  const cont=document.getElementById('lifts');
-  ses.lifts.forEach(L=>cont.appendChild(liftCard(L,lg)));
-  const acc=document.getElementById('acc');
-  ses.accessories.forEach(a=>acc.appendChild(accCard(a,lg)));
-  document.getElementById('hiit').appendChild(hiitCard());
+/* Próximo entrenamiento pendiente en el microciclo (3 fuerza + 1 HIIT por semana) */
+function nextTraining(){
+  for(let w=1;w<=WEEKS;w++){
+    for(let k=0;k<3;k++){
+      const s=(w-1)*3+k+1; if(s>TOTAL_SESSIONS) break;
+      if(!sessionLogged(s)) return {type:'fuerza', s, w};
+    }
+    if(!(S.hiit[w] && S.hiit[w].done)) return {type:'hiit', w};
+  }
+  return {type:'done'};
+}
 
-  document.getElementById('prevBtn').onclick=()=>{ if(S.current>1){S.current--;save();render();} };
-  document.getElementById('doneBtn').onclick=()=>{
-    const lg=logFor(S.current);
-    lg.date ||= new Date().toISOString().slice(0,10);
-    if(S.current===1 && !S.cfg.planStart) S.cfg.planStart=lg.date; // ancla el calendario
-    const wasLast = S.current>=TOTAL_SESSIONS;
-    recomputeCurrent(); save(); render(); window.scrollTo(0,0);
-    toast(wasLast ? '¡Fase I completada! 🎉' : 'Sesión guardada');
-  };
+let hoyMode=null; // 'fuerza' | 'hiit' — qué entrenas hoy
+function renderHoy(){
+  const nt=nextTraining();
+  if(hoyMode===null) hoyMode = (nt.type==='hiit') ? 'hiit' : 'fuerza';
+  const w=currentHiitWeek();
+  const hiitPending = !(S.hiit[w] && S.hiit[w].done);
+  const toggle=`<div class="day-toggle">
+      <button class="dt ${hoyMode==='fuerza'?'sel':''}" data-mode="fuerza">🏋️ Fuerza</button>
+      <button class="dt ${hoyMode==='hiit'?'sel':''}" data-mode="hiit">🔥 HIIT${hiitPending?' <span class="pdot"></span>':''}</button>
+    </div>`;
+
+  if(hoyMode==='hiit'){
+    // ----- DÍA DE HIIT (sesión independiente) -----
+    const def=HIIT[hiitOfWeek(w)]; const log=S.hiit[w]||{};
+    app.innerHTML=`${toggle}
+      <p class="eyebrow">HIIT · Semana ${w} · día independiente</p>
+      <h2 class="h-big" style="font-size:26px;margin-bottom:6px">${def.tag} · ${def.tipo}</h2>
+      <p class="sub">Es una sesión aparte, en un día <b>sin fuerza</b>.</p>
+      <div id="hiitday"></div>
+      <div class="btn-row">
+        <button class="btn" id="hiitDone">${log.done?'✓ HIIT completado · guardar de nuevo':'Completar HIIT ›'}</button>
+      </div>
+      <p class="tiny center">Apunta tu resultado y el día en que lo hiciste.</p>`;
+    document.getElementById('hiitday').appendChild(hiitCard());
+    document.getElementById('hiitDone').onclick=()=>{
+      const cur=S.hiit[w]||{}; cur.done=true; cur.tag=def.tag;
+      cur.date=cur.date||new Date().toISOString().slice(0,10);
+      S.hiit[w]=cur; save();
+      hoyMode='fuerza'; renderHoy(); window.scrollTo(0,0);
+      toast('HIIT guardado · a por la fuerza');
+    };
+  } else {
+    // ----- DÍA DE FUERZA -----
+    const ses=buildSession(S.current);
+    const lg=S.logs[S.current]||{sets:{},acc:{},fail:{},notes:{}};
+    app.innerHTML=`${toggle}
+      <p class="eyebrow">Sesión ${S.current} · Entrenamiento ${ses.day}</p>
+      <h2 class="h-big" style="font-size:26px;margin-bottom:14px">${ses.day==='A'?'Sentadilla · Banca · Peso muerto':'Sentadilla · Militar · Clean'}</h2>
+      <div id="lifts"></div>
+      <hr class="sep">
+      <p class="eyebrow">Accesorios</p>
+      <div id="acc"></div>
+      <div class="btn-row">
+        <button class="btn ghost" id="prevBtn">‹ Anterior</button>
+        <button class="btn" id="doneBtn">Completar sesión ›</button>
+      </div>
+      <p class="tiny center">El peso de cada sesión ya está calculado. Marca las series que completes.</p>`;
+    const cont=document.getElementById('lifts');
+    ses.lifts.forEach(L=>cont.appendChild(liftCard(L,lg)));
+    const acc=document.getElementById('acc');
+    ses.accessories.forEach(a=>acc.appendChild(accCard(a,lg)));
+    document.getElementById('prevBtn').onclick=()=>{ if(S.current>1){S.current--;save();renderHoy();} };
+    document.getElementById('doneBtn').onclick=()=>{
+      const l=logFor(S.current);
+      l.date ||= new Date().toISOString().slice(0,10);
+      if(S.current===1 && !S.cfg.planStart) S.cfg.planStart=l.date; // ancla el calendario
+      const wasLast = S.current>=TOTAL_SESSIONS;
+      recomputeCurrent(); save();
+      const nt2=nextTraining();
+      hoyMode = (nt2.type==='hiit') ? 'hiit' : 'fuerza';   // si toca HIIT, sugiérelo
+      renderHoy(); window.scrollTo(0,0);
+      toast(wasLast ? '¡Fase I completada! 🎉' : (nt2.type==='hiit'?'Fuerza guardada · ahora toca HIIT':'Sesión guardada'));
+    };
+  }
+  // selector de día (común a ambos modos)
+  document.querySelectorAll('.day-toggle .dt').forEach(b=>b.onclick=()=>{ hoyMode=b.dataset.mode; renderHoy(); window.scrollTo(0,0); });
 }
 
 function liftCard(L,lg){
@@ -558,8 +655,8 @@ function liftCard(L,lg){
       </div>
       <div class="help"><b>Claves de técnica:</b> ${LIFTS[L.key].cues.join(' · ')}
         <br><span class="pageref">📖 Barra Libre · pág. ${L.page} — repásalo si tienes dudas</span></div>
-      <div class="field" style="margin-top:10px"><label>Tus notas</label>
-        <textarea rows="2" data-note="${L.key}" placeholder="Sensaciones, dolores, ajustes...">${S.notes[L.key]||''}</textarea></div>
+      <div class="field" style="margin-top:10px"><label>Tus notas (solo de esta sesión)</label>
+        <textarea rows="2" data-note="${L.key}" placeholder="Sensaciones, dolores, ajustes...">${(lg.notes&&lg.notes[L.key])||''}</textarea></div>
     </div>`;
   // eventos
   div.querySelector('.card-head').onclick=(e)=>{ if(!e.target.closest('.tick')) div.classList.toggle('open'); };
@@ -585,7 +682,7 @@ function liftCard(L,lg){
     if(out==='fail'){ const sp=document.createElement('span'); sp.className='fail-tag'; sp.textContent='✗ Fallo'; head.insertBefore(sp, head.querySelector('.chev')); }
   });
   div.querySelector('[data-failnote]').addEventListener('change',e=>{ const log=logFor(S.current); log.fail[L.key]=e.target.value; save(); });
-  div.querySelector('[data-note]').addEventListener('change',e=>{ S.notes[L.key]=e.target.value; save(); });
+  div.querySelector('[data-note]').addEventListener('change',e=>{ const log=logFor(S.current); log.notes[L.key]=e.target.value; save(); });
   return div;
 }
 
@@ -623,7 +720,7 @@ function accCard(a,lg){
 /* Tarjeta de HIIT semanal: misma sesión durante toda la semana (recordatorio),
    se registra una vez. El número rota 1→4 según la semana. */
 function hiitCard(){
-  const w=weekOf(S.current); const def=HIIT[hiitOfWeek(w)];
+  const w=currentHiitWeek(); const def=HIIT[hiitOfWeek(w)];
   const log=S.hiit[w]||{};
   const div=document.createElement('div'); div.className='card open';
   div.innerHTML=`
@@ -819,6 +916,169 @@ function renderCalendario(){
   document.getElementById('calprev').onclick=()=>{ calRef=new Date(y,m-1,1); renderCalendario(); };
   document.getElementById('calnext').onclick=()=>{ calRef=new Date(y,m+1,1); renderCalendario(); };
   document.getElementById('calreset').onclick=()=>{ S.cfg.planStart=null; save(); calRef=null; renderCalendario(); };
+}
+
+/* ---- NUTRICIÓN (guía de alimentación por fases, fiel al libro) ---- */
+const FOODS=[
+  {g:'Vegetales',
+   ok:'Acelgas, ajo puerro, alcachofas, apio, berenjenas, brócoli, canónigos, cebollino, champiñones, col rizada, coliflor, endivias, espárragos, espinacas, repollo, rúcula, setas',
+   mod:'Calabaza, cebolla, guisantes frescos, remolacha, zanahorias, pimientos, tomates',
+   no:'Vegetales enlatados',
+   nota:'Los congelados valen. En volumen o mantenimiento, come de los dos grupos con libertad.'},
+  {g:'Frutas',
+   ok:'Arándanos, frambuesas, fresas, moras, limón, pomelo, mandarinas, coco, aguacate, cerezas',
+   mod:'Ciruela, kiwi, manzana, melocotón, melón, naranja, nectarina, papaya, pera, piña, uvas, fruta deshidratada (pasas, dátiles)',
+   no:'Frutas en lata o almíbar, mermeladas, zumos',
+   nota:'Clasificadas por azúcar. En volumen la distinción importa menos.'},
+  {g:'Almidones',
+   ok:'Tubérculos (patata, boniato/batata, yuca), legumbres, arroz (basmati y vaporizado), plátano macho verde',
+   mod:'Avena, mijo, quinoa, trigo sarraceno, legumbres y frutos secos con almidón (castañas)',
+   no:'Cereales con gluten, sobre todo trigo refinado: harinas, panes, galletas, pastas',
+   nota:'En fases de volumen puedes añadir de este grupo sin limitación.'},
+  {g:'Proteína',
+   ok:'Carne de caza, sardinas, salmón, gambas, bacalao, pollo, pavo, ternera/vaca, huevos, trucha, merluza, gelatina, órganos, atún, mariscos y moluscos, cerdo',
+   mod:'Algas, mero, pez espada, lubina, caballa, proteína de suero, lentejas, soja fermentada (natto, miso, tempeh)',
+   no:'Proteína de soja no fermentada, proteína de trigo (gluten), embutidos industriales, carnes procesadas',
+   nota:'En definición máxima, prioriza proteína de comida real sobre batidos.'},
+  {g:'Grasas',
+   ok:'Aguacate, yema de huevo, aceitunas, aceite de coco, aceite de oliva virgen extra, ghee, mantequilla',
+   mod:'Chocolate >85%, macadamias, pecanas, almendras, anacardos, avellanas, nueces, piñones, pistachos',
+   no:'Chocolates de baja calidad, margarina, grasas trans, aceites vegetales (girasol, canola, soja, maíz)',
+   nota:'Para cocinar, mejor aceite de oliva o de coco.'},
+  {g:'Lácteos',
+   ok:'Yogurt natural, kéfir, queso de leche cruda, requesón, mantequilla, leche de cabra',
+   mod:'Leche fresca, queso azul, otros quesos curados',
+   no:'Leche desnatada, leche UHT, leche condensada, leche en polvo, quesos procesados, helados',
+   nota:'La leche entera ayuda en volumen. Si no te sienta bien, prueba la de cabra.'},
+  {g:'Bebidas',
+   ok:'Agua, té verde, infusiones, café, agua de coco',
+   mod:'Leche de coco, kombucha, leche de almendras/cabra/vaca/arroz/avena, zumo natural, leche de soja',
+   no:'Bebidas alcohólicas, refrescos, bebidas light, bebidas deportivas y energéticas, zumos envasados',
+   nota:'El agua con medio limón es buena opción. Té verde y café ayudan a quemar grasa; sin abusar por la tarde.'},
+];
+function nutGramos(cal,pKg,chKg,peso){
+  const P=Math.round(pKg*peso), CH=Math.round(chKg*peso);
+  const G=Math.max(0,Math.round((cal-P*4-CH*4)/9));
+  return {P,CH,G};
+}
+let nutPhase='1';
+function renderNutricion(){
+  const n=S.cfg.nutri||{};
+  app.innerHTML=`
+    <p class="eyebrow">Alimentación · Barra Libre</p>
+    <h2 class="h-big" style="font-size:24px">Cómo comer en cada fase</h2>
+    <p class="lead">El programa no te pone a dieta: eleva tu <b>flujo de energía</b> (comer y entrenar más) cuidando el metabolismo. Prioridad: <b>alimentos > calorías > macros > frecuencia > suplementos</b>. Requisito de partida: empezar por debajo del 18% de grasa.</p>
+
+    <p class="eyebrow" style="margin-top:18px">Tus números</p>
+    <div class="card"><div class="card-body" style="display:block;border:none">
+      <div class="calc-grid">
+        <div class="field"><label>Edad</label><input type="number" id="nu_edad" value="${n.edad||''}" inputmode="numeric"></div>
+        <div class="field"><label>Altura (cm)</label><input type="number" id="nu_alt" value="${n.altura||''}" inputmode="numeric"></div>
+        <div class="field"><label>Peso (kg)</label><input type="number" id="nu_peso" value="${n.peso||''}" inputmode="decimal"></div>
+        <div class="field"><label>% grasa (opc.)</label><input type="number" id="nu_grasa" value="${n.grasa||''}" placeholder="—" inputmode="decimal"></div>
+      </div>
+      <button class="btn" id="nu_calc">Calcular mis objetivos</button>
+      <div class="res-block" id="nu_out"></div>
+    </div></div>
+    <div class="note">Fórmulas del programa: basal por Harris-Benedict (Mifflin) y, si das tu % grasa, media con Katch-McArdle. Mantenimiento = basal × 1,65. Son estimaciones (±10%): ajústalas a tu progreso.</div>
+
+    <p class="eyebrow" style="margin-top:22px">El programa</p>
+    <h3 class="sub2" style="margin-top:4px">Alimentación por fase</h3>
+    <div class="ntabs" id="nu_tabs">
+      <button data-ph="1" class="${nutPhase==='1'?'sel':''}">Fase I · Fuerza</button>
+      <button data-ph="2" class="${nutPhase==='2'?'sel':''}">Fase II · Hipertrofia</button>
+      <button data-ph="3" class="${nutPhase==='3'?'sel':''}">Fase III · Def. máx</button>
+      <button data-ph="4" class="${nutPhase==='4'?'sel':''}">Fase IV · Ajustes</button>
+    </div>
+    <div id="nu_phases">
+      <div class="phase ${nutPhase==='1'?'show':''}" data-ph="1"><div class="card"><div class="card-body" style="display:block;border:none">
+        <div><span class="tag bloc">Dieta inversa</span><span class="tag bloc">Volumen</span><span class="tag bloc">Definición</span></div>
+        <div class="kv"><span class="k">Estrategia</span><span>Si comías poco, arranca con <b>dieta inversa</b>. Luego <b>volumen</b>; cuando la grasa suba (~18-20%), pasa a <b>definición</b>.</span></div>
+        <div class="kv"><span class="k">Volumen</span><span>+10-15% · proteína 2 g/kg · carbohidrato 3-6 g/kg.</span></div>
+        <div class="kv"><span class="k">Definición</span><span>−15% · proteína 2,2-2,5 g/kg · recarga semanal · 4-6 sem máx.</span></div>
+        <div class="kv"><span class="k">Estructura</span><span>3 comidas + snack + <b>batido post-entreno</b>. Días de descanso, baja un poco las calorías.</span></div>
+        <div class="kv"><span class="k">Suplementos</span><span><span class="tag sup">Proteína suero</span><span class="tag sup">Creatina 5 g</span></span></div>
+      </div></div></div>
+      <div class="phase ${nutPhase==='2'?'show':''}" data-ph="2"><div class="card"><div class="card-body" style="display:block;border:none">
+        <div><span class="tag bloc">Volumen</span><span class="tag bloc">Definición</span></div>
+        <div class="kv"><span class="k">Estrategia</span><span><b>Igual que Fase I</b>: alternas volumen y definición.</span></div>
+        <div class="kv"><span class="k">Ajuste</span><span>Pesas más que antes → <b>recalcula tu mantenimiento</b> para seguir progresando.</span></div>
+        <div class="kv"><span class="k">Suplementos</span><span><span class="tag sup">Proteína suero</span><span class="tag sup">Creatina</span></span></div>
+      </div></div></div>
+      <div class="phase ${nutPhase==='3'?'show':''}" data-ph="3"><div class="card"><div class="card-body" style="display:block;border:none">
+        <div><span class="tag bloc">Definición máxima</span><span class="tag bloc">Recarga semanal</span></div>
+        <div class="kv"><span class="k">Objetivo</span><span>Bajar a <b>6-9% grasa</b> en ~1 mes. Solo si ya estás ≤12-13%.</span></div>
+        <div class="kv"><span class="k">Calorías</span><span><b>Peso (kg) × 22</b>. Es poco a propósito.</span></div>
+        <div class="kv"><span class="k">Macros</span><span>Proteína ~2,5 g/kg de comida real · carbohidrato &lt;1 g/kg (post-entreno) · grasa 40-60%.</span></div>
+        <div class="kv"><span class="k">Suplementos</span><span><b>Quitas</b> proteína y creatina. <b>Añades</b> <span class="tag sup">Cafeína 200 mg</span><span class="tag sup">Aminoácidos 4-6 g</span> pre-entreno.</span></div>
+      </div></div>
+        <div class="note warn">Máximo 4-6 semanas, con recarga semanal, y no más de una vez al año.</div>
+      </div>
+      <div class="phase ${nutPhase==='4'?'show':''}" data-ph="4"><div class="card"><div class="card-body" style="display:block;border:none">
+        <div><span class="tag bloc">Dieta inversa</span><span class="tag bloc">Volumen</span></div>
+        <div class="kv"><span class="k">Estrategia</span><span>Si vienes de Fase III, <b>dieta inversa 10-15 días</b>; luego <b>volumen</b> (+10-15%).</span></div>
+        <div class="kv"><span class="k">Suplementos</span><span>Retomas <span class="tag sup">Proteína</span><span class="tag sup">Creatina 0,1 g/kg</span> ("efecto especial" con la grasa baja).</span></div>
+      </div></div></div>
+    </div>
+
+    <p class="eyebrow" style="margin-top:22px">Qué comer</p>
+    <h3 class="sub2" style="margin-top:4px">Listas de alimentos</h3>
+    <p class="lead" style="font-size:13.5px">Priorizar (50-60%) · Moderar (30-40%) · Eliminar (&lt;10%). No es dogma; en volumen las distinciones importan menos.</p>
+    <div id="nu_foods"></div>
+
+    <p class="eyebrow" style="margin-top:22px">Reglas de oro</p>
+    <div class="card"><div class="card-body" style="display:block;border:none">
+      <div class="kv"><span class="k">Post-entreno</span><span>La comida tras entrenar es la que más importa del "timing".</span></div>
+      <div class="kv"><span class="k">Menos comidas</span><span>Las menos posibles que te permitan llegar a calorías y macros.</span></div>
+      <div class="kv"><span class="k">Cena pronto</span><span>Mejor adaptados a comer de día.</span></div>
+      <div class="kv"><span class="k">Hidratación</span><span>~1-1,5 L por cada 1.000 kcal cuando buscas crecer.</span></div>
+    </div></div>
+    <p class="tiny center" style="margin-top:16px">Basado en el programa Barra Libre (Fitness Revolucionario).</p>
+  `;
+  // calculadora
+  document.getElementById('nu_calc').onclick=nutCalcular;
+  // tabs
+  document.querySelectorAll('#nu_tabs button').forEach(b=>b.onclick=()=>{
+    nutPhase=b.dataset.ph;
+    document.querySelectorAll('#nu_tabs button').forEach(x=>x.classList.toggle('sel',x===b));
+    document.querySelectorAll('#nu_phases .phase').forEach(p=>p.classList.toggle('show',p.dataset.ph===nutPhase));
+  });
+  // alimentos (tarjetas colapsables reutilizando el estilo de la app)
+  const fc=document.getElementById('nu_foods');
+  FOODS.forEach(f=>{
+    const c=document.createElement('div'); c.className='card';
+    c.innerHTML=`<div class="card-head"><div class="left"><span class="ex-name" style="font-size:17px">${f.g}</span></div><span class="chev">▶</span></div>
+      <div class="card-body">
+        <div class="foodcol"><div class="lbl"><span class="fdot ok"></span>Priorizar</div><div class="items">${f.ok}</div></div>
+        <div class="foodcol"><div class="lbl"><span class="fdot mod"></span>Moderar</div><div class="items">${f.mod}</div></div>
+        <div class="foodcol"><div class="lbl"><span class="fdot no"></span>Eliminar</div><div class="items">${f.no}</div></div>
+        <p class="tiny" style="margin-top:6px">${f.nota}</p></div>`;
+    c.querySelector('.card-head').onclick=()=>c.classList.toggle('open');
+    fc.appendChild(c);
+  });
+  if(n.peso) nutCalcular();
+}
+function nutCalcular(){
+  const edad=+document.getElementById('nu_edad').value, alt=+document.getElementById('nu_alt').value,
+        peso=+document.getElementById('nu_peso').value, grasa=parseFloat(document.getElementById('nu_grasa').value);
+  const out=document.getElementById('nu_out');
+  if(!(edad>0&&alt>0&&peso>0)){ out.innerHTML='<p class="tiny">Rellena edad, altura y peso.</p>'; return; }
+  S.cfg.nutri={edad,altura:alt,peso,grasa:isNaN(grasa)?'':grasa}; save();
+  const mifflin=10*peso+6.25*alt-5*edad+5;
+  let tmb=mifflin, metodo='Harris-Benedict (Mifflin)';
+  if(grasa>0&&grasa<60){ const magra=peso*(1-grasa/100); tmb=(mifflin+370+21.6*magra)/2; metodo='media Mifflin + Katch-McArdle'; }
+  const mant=tmb*1.65, volumen=mant*1.125, defin=mant*0.85, defmax=peso*22;
+  const rows=[
+    {n:'Mantenimiento',s:'lo que gastas al día',cal:mant,m:nutGramos(mant,2,(mant*0.45/4)/peso,peso)},
+    {n:'Volumen',s:'+10-15% · ganar músculo',cal:volumen,m:nutGramos(volumen,2,4.5,peso)},
+    {n:'Definición',s:'−15% · perder grasa',cal:defin,m:nutGramos(defin,2.35,3,peso)},
+    {n:'Definición máxima',s:'peso × 22 · fase dura',cal:defmax,m:nutGramos(defmax,2.5,0.8,peso)},
+  ];
+  out.innerHTML=`<div class="res-row"><div class="rn">Metabolismo basal<small>${metodo}</small></div><div class="kcal">${Math.round(tmb)}</div></div>`+
+    rows.map(r=>`<div class="res-row"><div class="rn">${r.n}<small>${r.s}</small></div>
+      <div style="text-align:right"><div class="kcal">${Math.round(r.cal)} kcal</div>
+      <div class="macros">P ${r.m.P} · CH ${r.m.CH} · G ${r.m.G} g</div></div></div>`).join('')+
+    `<p class="tiny" style="margin-top:10px">±10%. Si no progresas, ajusta ±100-150 kcal y reevalúa en 1-2 semanas.</p>`;
 }
 
 /* ---- AJUSTES ---- */
