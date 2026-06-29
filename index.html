@@ -167,6 +167,16 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
   background:var(--surface);border:1px solid var(--line);color:var(--muted)}
 .progress-pick button.sel{background:var(--accent);color:#160a02;border-color:var(--accent)}
 .spark{width:100%;height:120px;display:block;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.chart-wrap{position:relative}
+.chart{width:100%;height:auto;display:block;background:var(--surface);border:1px solid var(--line);border-radius:12px;touch-action:none;cursor:crosshair}
+.chart-tip{position:absolute;top:6px;transform:translateX(-50%);background:#0e1013;border:1px solid var(--line);color:var(--text);
+  font-size:12px;padding:5px 9px;border-radius:8px;pointer-events:none;opacity:0;transition:opacity .1s;white-space:nowrap;z-index:5}
+.chart-tip b{color:var(--warm)}
+.chart-ctrls{display:flex;gap:6px;justify-content:center;margin-top:8px}
+.cbtn{width:42px;height:34px;border-radius:9px;background:var(--surface);border:1px solid var(--line);color:var(--text);
+  font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.cbtn:active{background:var(--surface-2)}
+.bench-key{color:#3fae6a;font-weight:600}
 .stat-line{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--surface-2);font-size:14px}
 .stat-line:last-child{border:none}
 .stat-line b{font-family:'Barlow Condensed';font-weight:700;color:var(--warm);font-size:18px}
@@ -877,93 +887,195 @@ function histHiit({w,date,tag,res}){
 }
 
 /* ---- PROGRESO ---- */
+// Listón de "intermedio" del libro (si no mueves esto, sigues siendo novato):
+// múltiplos de tu peso corporal. Clean no lo da el libro: estimación orientativa.
+const BENCH={sentadilla:1.5, peso_muerto:1.8, banca:1.0, militar:0.75, clean:0.7};
 let progLift='sentadilla';
+let chartWin=null, chartEnd=null;        // ventana de zoom (nº de puntos visibles / índice derecho)
+function niceMax(v){ const s=v<=60?5:v<=140?10:20; return Math.ceil(v/s)*s; }
+function niceMin(v){ const s=v<=60?5:10; return Math.max(0, Math.floor(v/s)*s); }
+
+function progData(){
+  const L=LIFTS[progLift];
+  const bw=(S.cfg.nutri && +S.cfg.nutri.peso)||0;
+  const benchmark = bw ? nearestLoadable(bw*BENCH[progLift]) : null;
+  const startW=startWork(progLift);
+  const pts=[]; let projCount=0;
+  for(let s=1;s<=TOTAL_SESSIONS;s++){
+    if(!appearsIn(L.day,s)) continue;
+    const done=sessionLogged(s), w=workWeight(progLift,s);
+    pts.push({s,w,done});
+    if(!done){ projCount++; if(benchmark && w>=benchmark) break; if(!benchmark && projCount>=8) break; }
+  }
+  return {L,bw,benchmark,startW,pts};
+}
 function renderProgreso(){
   app.innerHTML=`<p class="eyebrow">Progreso</p>
-    <h2 class="h-big" style="font-size:24px">Carga por sesión</h2>
+    <h2 class="h-big" style="font-size:24px">Camino al nivel intermedio</h2>
     <div class="progress-pick" id="pick">
       ${Object.entries(LIFTS).map(([k,L])=>`<button data-k="${k}" class="${k===progLift?'sel':''}">${L.label}</button>`).join('')}
     </div>
-    <svg class="spark" id="spark" viewBox="0 0 320 120" preserveAspectRatio="none"></svg>
+    <div class="chart-wrap">
+      <svg class="chart" id="chart" viewBox="0 0 344 236"></svg>
+      <div class="chart-tip" id="chartTip"></div>
+    </div>
+    <div class="chart-ctrls">
+      <button class="cbtn" id="zpan-l">◀</button>
+      <button class="cbtn" id="zout">−</button>
+      <button class="cbtn" id="zreset">⤢</button>
+      <button class="cbtn" id="zin">+</button>
+      <button class="cbtn" id="zpan-r">▶</button>
+    </div>
+    <p class="tiny center" style="margin-top:2px">Toca o arrastra la gráfica para ver cada valor · usa +/− para acercar</p>
     <div id="pstats" style="margin-top:14px"></div>`;
-  document.querySelectorAll('#pick button').forEach(b=>b.onclick=()=>{progLift=b.dataset.k;renderProgreso();});
-  drawSpark();
+  document.querySelectorAll('#pick button').forEach(b=>b.onclick=()=>{ progLift=b.dataset.k; chartWin=null; chartEnd=null; renderProgreso(); });
+  const d=progData();
+  const redraw=()=>drawChart(d);
+  redraw();
+  const n=d.pts.length;
+  document.getElementById('zin').onclick =()=>{ chartWin=Math.max(4, Math.round((chartWin||n)/1.6)); clampWin(n); redraw(); };
+  document.getElementById('zout').onclick=()=>{ chartWin=Math.min(n, Math.round((chartWin||n)*1.6)); clampWin(n); redraw(); };
+  document.getElementById('zreset').onclick=()=>{ chartWin=n; chartEnd=n-1; redraw(); };
+  document.getElementById('zpan-l').onclick=()=>{ chartEnd=Math.max((chartWin||n)-1, (chartEnd==null?n-1:chartEnd)-2); redraw(); };
+  document.getElementById('zpan-r').onclick=()=>{ chartEnd=Math.min(n-1, (chartEnd==null?n-1:chartEnd)+2); redraw(); };
+  renderStats(d);
 }
-function drawSpark(){
-  const L=LIFTS[progLift]; const pts=[];
-  for(let s=1;s<=TOTAL_SESSIONS;s++) if(appearsIn(L.day,s)) pts.push({s, w:workWeight(progLift,s), done:sessionLogged(s)});
-  const ws=pts.map(p=>p.w), min=Math.min(...ws), max=Math.max(...ws), pad=8, W=320,H=120;
-  const X=i=>pad+(W-2*pad)*i/(pts.length-1||1);
-  const Y=w=>H-pad-(H-2*pad)*(w-min)/((max-min)||1);
-  const line=pts.map((p,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${Y(p.w).toFixed(1)}`).join(' ');
-  const lastDone=Math.max(0,...pts.filter(p=>p.done).map(p=>p.s));
-  const svg=document.getElementById('spark');
-  svg.innerHTML=`
-    <path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>
-    ${pts.map((p,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(p.w).toFixed(1)}" r="${p.done?3.6:2}" fill="${p.done?'var(--warm)':'var(--faint)'}"><title>Sesión ${p.s}: ${p.w} kg${p.done?' ✓':''}</title></circle>`).join('')}`;
-  const doneVals=pts.filter(p=>p.done);
-  const ahora = doneVals.length? doneVals[doneVals.length-1].w : pts[0].w;
-  document.getElementById('pstats').innerHTML=`
-    <div class="stat-line">Peso inicial<b>${pts[0].w} kg</b></div>
-    <div class="stat-line">Peso al final de Fase I<b>${pts[pts.length-1].w} kg</b></div>
-    <div class="stat-line">Incremento total programado<b>+${pts[pts.length-1].w-pts[0].w} kg</b></div>
-    <div class="stat-line">Tu último peso registrado<b>${ahora} kg</b></div>
-    <div class="stat-line">Sesiones completadas (este movimiento)<b>${doneVals.length}/${pts.length}</b></div>`;
+function clampWin(n){ if(chartWin>n)chartWin=n; if(chartEnd==null)chartEnd=n-1; chartEnd=Math.min(n-1,Math.max(chartWin-1,chartEnd)); }
+function drawChart(d){
+  const {benchmark,startW,pts}=d, n=pts.length;
+  if(chartWin===null||chartWin>n){ chartWin=n; chartEnd=n-1; }
+  clampWin(n);
+  const vis=pts.slice(chartEnd-chartWin+1, chartEnd+1), m=vis.length;
+  const vw=vis.map(p=>p.w);
+  let yMax=Math.max(...vw, benchmark||0, startW), yMin=Math.min(...vw, startW);
+  yMax=niceMax(yMax+ (yMax-yMin<8?4:0)); yMin=niceMin(yMin-1); if(yMax<=yMin) yMax=yMin+10;
+  const VBW=344,VBH=236, mL=40,mR=14,mT=14,mB=24;
+  const pX0=mL,pX1=VBW-mR,pY0=mT,pY1=VBH-mB,pW=pX1-pX0,pH=pY1-pY0;
+  const X=i=>pX0+pW*(m>1?i/(m-1):0.5);
+  const Y=w=>pY1-pH*(w-yMin)/((yMax-yMin)||1);
+  let grid='';
+  for(let g=0;g<=5;g++){ const val=yMin+(yMax-yMin)*g/5, yy=Y(val).toFixed(1);
+    grid+=`<line x1="${pX0}" y1="${yy}" x2="${pX1}" y2="${yy}" stroke="var(--line)" stroke-width="0.7"/>`+
+          `<text x="${pX0-5}" y="${(+yy+3).toFixed(1)}" fill="var(--faint)" font-size="9" text-anchor="end" font-family="Inter,sans-serif">${Math.round(val)}</text>`; }
+  let xl=''; const idxs=[...new Set(m<=1?[0]:[0,Math.floor((m-1)/2),m-1])];
+  idxs.forEach(i=>{ xl+=`<text x="${X(i).toFixed(1)}" y="${pY1+15}" fill="var(--faint)" font-size="9" text-anchor="middle" font-family="Inter,sans-serif">S${vis[i].s}</text>`; });
+  xl+=`<text x="${pX0-26}" y="${pY0+4}" fill="var(--faint)" font-size="8" font-family="Inter,sans-serif">kg</text>`;
+  let bench='';
+  if(benchmark && benchmark>=yMin && benchmark<=yMax){
+    const by=Y(benchmark), tagW=104, tagX=Math.max(pX0, pX1-tagW);
+    bench=`<line x1="${pX0}" y1="${by.toFixed(1)}" x2="${pX1}" y2="${by.toFixed(1)}" stroke="#3fae6a" stroke-width="1.7" stroke-dasharray="5 3"/>`+
+      `<rect x="${tagX}" y="${(by-16).toFixed(1)}" width="${tagW}" height="13" rx="3" fill="#3fae6a"/>`+
+      `<text x="${tagX+tagW/2}" y="${(by-6).toFixed(1)}" fill="#0c140f" font-size="8.5" font-weight="700" text-anchor="middle" font-family="Inter,sans-serif">INTERMEDIO · ${benchmark} kg</text>`;
+  }
+  const line=vis.map((p,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${Y(p.w).toFixed(1)}`).join(' ');
+  const dots=vis.map((p,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(p.w).toFixed(1)}" r="${p.done?3.4:2.2}" fill="${p.done?'var(--warm)':'var(--faint)'}"/>`).join('');
+  const svg=document.getElementById('chart');
+  svg.innerHTML=`${grid}${bench}<path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="round"/>${dots}${xl}
+    <line id="cross" x1="0" y1="${pY0}" x2="0" y2="${pY1}" stroke="var(--warm)" stroke-width="1" opacity="0"/>
+    <circle id="crossdot" r="4.6" fill="none" stroke="var(--warm)" stroke-width="2" opacity="0"/>`;
+  const tip=document.getElementById('chartTip');
+  const at=clientX=>{
+    const rect=svg.getBoundingClientRect(); const vx=(clientX-rect.left)/rect.width*VBW;
+    let best=0,bd=1e9; vis.forEach((p,i)=>{ const dd=Math.abs(X(i)-vx); if(dd<bd){bd=dd;best=i;} });
+    const p=vis[best], px=X(best), py=Y(p.w);
+    const cr=document.getElementById('cross'), cd=document.getElementById('crossdot');
+    cr.setAttribute('x1',px); cr.setAttribute('x2',px); cr.setAttribute('opacity','0.5');
+    cd.setAttribute('cx',px); cd.setAttribute('cy',py); cd.setAttribute('opacity','1');
+    tip.innerHTML=`Sesión ${p.s} · <b>${p.w} kg</b>${p.done?' ✓':' <span style="opacity:.6">(previsto)</span>'}`;
+    tip.style.opacity='1'; tip.style.left=Math.min(78,Math.max(2,(px/VBW)*100))+'%';
+  };
+  const hide=()=>{ const cr=document.getElementById('cross'),cd=document.getElementById('crossdot'); if(cr)cr.setAttribute('opacity','0'); if(cd)cd.setAttribute('opacity','0'); tip.style.opacity='0'; };
+  svg.onpointerdown=e=>{ if(svg.setPointerCapture){try{svg.setPointerCapture(e.pointerId)}catch(_){}} at(e.clientX); };
+  svg.onpointermove=e=>{ if(e.buttons||e.pointerType==='touch') at(e.clientX); };
+  svg.onpointerup=hide; svg.onpointercancel=hide; svg.onpointerleave=e=>{ if(!e.buttons) hide(); };
+}
+function renderStats(d){
+  const {L,benchmark,startW,pts}=d;
+  const frontier=lastCompletedSession()+1;
+  let ns=frontier; while(ns<=TOTAL_SESSIONS && !appearsIn(L.day,ns)) ns++;
+  const currentW = ns<=TOTAL_SESSIONS ? workWeight(progLift,ns) : pts[pts.length-1].w;
+  const doneCount=pts.filter(p=>p.done).length;
+  let html;
+  if(benchmark){
+    const faltan=Math.max(0,+(benchmark-currentW).toFixed(2));
+    const sesiones=faltan>0?Math.ceil(faltan/L.inc):0;
+    html=`<div class="stat-line"><span class="bench-key">▦ Objetivo intermedio (${BENCH[progLift]}× tu peso)</span><b>${benchmark} kg</b></div>
+      <div class="stat-line">Tu peso de trabajo actual<b>${currentW} kg</b></div>
+      <div class="stat-line">Te faltan<b>${faltan>0?('+'+faltan+' kg'):'¡conseguido! 💪'}</b></div>
+      ${faltan>0?`<div class="stat-line">Sesiones estimadas (subiendo limpio)<b>~${sesiones}</b></div>`:''}
+      <div class="stat-line">Peso de partida<b>${startW} kg</b></div>
+      <div class="stat-line">Sesiones completadas<b>${doneCount}</b></div>`;
+    if(progLift==='clean') html+=`<p class="tiny" style="margin-top:8px">El libro no da listón para el clean; 0,7× es una estimación orientativa.</p>`;
+  } else {
+    html=`<div class="stat-line">Peso de partida<b>${startW} kg</b></div>
+      <div class="stat-line">Tu peso de trabajo actual<b>${currentW} kg</b></div>
+      <div class="stat-line">Sesiones completadas<b>${doneCount}</b></div>
+      <div class="note" style="margin-top:10px">Introduce tu <b>peso corporal</b> en la pestaña <b>Dieta</b> para ver tu objetivo de nivel intermedio (lo que Marcos marca como salir de novato).</div>`;
+  }
+  document.getElementById('pstats').innerHTML=html;
 }
 
-/* ---- CALENDARIO / PLAN ----
-   Microciclo de 7 días: Fuerza · descanso · Fuerza · descanso · Fuerza · HIIT · descanso */
-const CYCLE=['F','-','F','-','F','H','-'];
-function planStartDate(){ return S.cfg.planStart || (S.logs[1] && S.logs[1].date) || null; }
+/* ---- CALENDARIO / PLAN (flexible) ----
+   Lo ya hecho tiene fecha real (fija). Lo que queda se proyecta desde HOY
+   (o desde la fecha de reanudación que fijes), repartiendo la secuencia
+   pendiente sobre el microciclo: entreno-descanso-entreno-descanso-entreno-HIIT-descanso. */
 function isoToDate(iso){ const [y,m,d]=iso.split('-').map(Number); return new Date(y,m-1,d); }
 function dateToIso(dt){ return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`; }
 function daysBetween(aIso,bIso){ return Math.round((isoToDate(bIso)-isoToDate(aIso))/86400000); }
 function formatEs(iso){ return isoToDate(iso).toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'}); }
-function planAt(offset){
-  if(offset<0 || offset>=WEEKS*7) return null;
-  const week=Math.floor(offset/7)+1, pos=offset%7, slot=CYCLE[pos];
-  if(slot==='-') return {type:'rest'};
-  if(slot==='H') return {type:'hiit', week, tag:'HIIT 0'+hiitOfWeek(week)};
-  const idx={0:1,2:2,4:3}[pos]; const sNum=(week-1)*3+idx;
-  return {type:'fuerza', s:sNum, day:sNum%2?'A':'B'};
+function todayIso(){ return new Date().toISOString().slice(0,10); }
+
+const TRAIN_OFFSETS=[0,2,4,5];                 // días de entreno dentro de cada bloque de 7
+function offsetOfIndex(i){ return Math.floor(i/4)*7 + TRAIN_OFFSETS[i%4]; }
+// Secuencia ordenada de lo que queda por entrenar (fuerza + HIIT, en orden de microciclo)
+function remainingSequence(){
+  const seq=[];
+  for(let w=1;w<=WEEKS;w++){
+    for(let k=0;k<3;k++){ const s=(w-1)*3+k+1; if(s>TOTAL_SESSIONS) break; if(!sessionLogged(s)) seq.push({type:'fuerza', s, day:s%2?'A':'B'}); }
+    if(!(S.hiit[w] && S.hiit[w].done)) seq.push({type:'hiit', w});
+  }
+  return seq;
 }
-function offsetOfSession(n){ const week=Math.ceil(n/3), pos=[0,2,4][(n-1)%3]; return (week-1)*7+pos; }
-function dateOfSession(n){ const st=planStartDate(); if(!st) return null; const dt=isoToDate(st); dt.setDate(dt.getDate()+offsetOfSession(n)); return dt; }
-function loggedOnDate(iso){
-  return Object.values(S.logs).some(l=>l.date===iso) || Object.values(S.hiit).some(h=>h.date===iso);
+// Fecha desde la que se reparte lo pendiente: la que fijes (si es futura) o hoy
+function resumeIso(){ const t=todayIso(); return (S.cfg.resumeDate && S.cfg.resumeDate>=t) ? S.cfg.resumeDate : t; }
+function projectedMap(){
+  const start=resumeIso(), seq=remainingSequence(), map={};
+  seq.forEach((t,i)=>{ const dt=isoToDate(start); dt.setDate(dt.getDate()+offsetOfIndex(i)); map[dateToIso(dt)]={...t}; });
+  const endIso = seq.length ? (()=>{ const dt=isoToDate(start); dt.setDate(dt.getDate()+offsetOfIndex(seq.length-1)); return dateToIso(dt); })() : null;
+  return {map, start, endIso, seq};
+}
+function completedMap(){
+  const map={};
+  Object.keys(S.logs).forEach(s=>{ const l=S.logs[s]; if(l && l.date) map[l.date]={type:'fuerza', s:+s, day:(+s)%2?'A':'B'}; });
+  Object.keys(S.hiit).forEach(w=>{ const h=S.hiit[w]; if(h && h.date && h.done) map[h.date]={type:'hiit', w:+w}; });
+  return map;
 }
 
 let calRef=null; // primer día del mes que se está viendo
 function renderCalendario(){
-  const st=planStartDate();
-  if(!st){
-    app.innerHTML=`<p class="eyebrow">Plan · Calendario</p>
-      <h2 class="h-big" style="font-size:24px">¿Cuándo empiezas?</h2>
-      <p class="sub">Pon la fecha de tu <b>primer entrenamiento</b> (Sesión 1, día A) y te proyecto todo el plan: qué toca cada día y cuándo terminarás la Fase I.</p>
-      <div class="field"><label>Fecha del primer entrenamiento</label><input type="date" id="planstart" value="${new Date().toISOString().slice(0,10)}"></div>
-      <button class="btn" id="setplan">Generar calendario</button>`;
-    document.getElementById('setplan').onclick=()=>{ S.cfg.planStart=document.getElementById('planstart').value; save(); calRef=null; renderCalendario(); toast('Calendario generado'); };
-    return;
-  }
   if(!calRef){ const t=new Date(); calRef=new Date(t.getFullYear(),t.getMonth(),1); }
   const y=calRef.getFullYear(), m=calRef.getMonth();
   const monthName=calRef.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
   const startWd=(new Date(y,m,1).getDay()+6)%7;      // lunes = 0
   const daysInMonth=new Date(y,m+1,0).getDate();
-  const todayIso=new Date().toISOString().slice(0,10);
-  const endDt=dateOfSession(TOTAL_SESSIONS);
+  const tIso=todayIso();
+  const done=completedMap(), proj=projectedMap();
 
   let cells='';
   for(let i=0;i<startWd;i++) cells+=`<div class="cal-cell empty"></div>`;
   for(let d=1;d<=daysInMonth;d++){
     const iso=dateToIso(new Date(y,m,d));
-    const p=planAt(daysBetween(st,iso));
-    let label='', cls='';
-    if(p && p.type==='fuerza'){ label=`F·${p.day}`; cls='f'; }
-    else if(p && p.type==='hiit'){ label='H'+hiitOfWeek(p.week); cls='h'; }
-    cells+=`<div class="cal-cell ${cls} ${iso===todayIso?'today':''}">
-      <span class="cal-d">${d}</span>${label?`<span class="cal-lab">${label}</span>`:''}${loggedOnDate(iso)?'<span class="cal-chk">✓</span>':''}</div>`;
+    const real=done[iso], plan=proj.map[iso];
+    let label='', cls='', chk='';
+    if(real){ chk='<span class="cal-chk">✓</span>';
+      if(real.type==='fuerza'){ label=`F·${real.day}`; cls='f done'; } else { label='H'; cls='h done'; } }
+    else if(plan){
+      if(plan.type==='fuerza'){ label=`F·${plan.day}`; cls='f'; } else { label='H'+hiitOfWeek(plan.w); cls='h'; } }
+    cells+=`<div class="cal-cell ${cls} ${iso===tIso?'today':''}">
+      <span class="cal-d">${d}</span>${label?`<span class="cal-lab">${label}</span>`:''}${chk}</div>`;
   }
+  const finTxt = proj.endIso ? formatEs(proj.endIso) : '¡Fase completada!';
+  const proxTxt = proj.seq.length ? formatEs(proj.start) : '—';
   app.innerHTML=`<p class="eyebrow">Plan · Calendario</p>
     <div class="cal-head">
       <button class="cal-nav" id="calprev">‹</button>
@@ -973,15 +1085,20 @@ function renderCalendario(){
     <div class="cal-grid">${cells}</div>
     <div class="cal-legend"><span class="lg f"></span> Fuerza A/B <span class="lg h"></span> HIIT <span class="lg tdy"></span> Hoy · ✓ realizado</div>
     <div class="card"><div class="card-body" style="display:block;border:none">
-      <div class="stat-line">Inicio del plan<b>${formatEs(st)}</b></div>
-      <div class="stat-line">Fin estimado Fase I<b>${endDt?formatEs(dateToIso(endDt)):'—'}</b></div>
-      <div class="stat-line">Próxima sesión (S${S.current})<b>${dateOfSession(S.current)?formatEs(dateToIso(dateOfSession(S.current))):'—'}</b></div>
+      <div class="field" style="margin-bottom:6px"><label>Próximo entrenamiento (cámbialo si te vas unos días)</label>
+        <input type="date" id="resumeDate" value="${resumeIso()}" min="${tIso}"></div>
+      <div class="stat-line">Fin estimado de fase<b>${finTxt}</b></div>
+      <div class="stat-line">Te quedan<b>${proj.seq.length} entrenamientos</b></div>
     </div></div>
-    <button class="btn ghost" id="calreset">Cambiar fecha de inicio</button>
-    <p class="tiny center" style="margin-top:10px">Es una estimación. Si entrenas en otros días, tus fechas reales (✓) pueden no coincidir con el plan.</p>`;
+    <p class="tiny center" style="margin-top:10px">El plan se proyecta desde hoy y se mueve contigo. Si te vas unos días, pon ahí la fecha en la que vuelves a entrenar y todo se recoloca.</p>`;
   document.getElementById('calprev').onclick=()=>{ calRef=new Date(y,m-1,1); renderCalendario(); };
   document.getElementById('calnext').onclick=()=>{ calRef=new Date(y,m+1,1); renderCalendario(); };
-  document.getElementById('calreset').onclick=()=>{ S.cfg.planStart=null; save(); calRef=null; renderCalendario(); };
+  document.getElementById('resumeDate').addEventListener('change',e=>{
+    S.cfg.resumeDate = e.target.value || null; save();
+    // saltar la vista al mes de la fecha elegida
+    if(e.target.value){ const dt=isoToDate(e.target.value); calRef=new Date(dt.getFullYear(),dt.getMonth(),1); }
+    renderCalendario(); toast('Calendario recolocado');
+  });
 }
 
 /* ---- NUTRICIÓN (guía de alimentación por fases, fiel al libro) ---- */
