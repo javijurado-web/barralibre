@@ -1026,7 +1026,9 @@ function niceMin(v){ const s=v<=60?5:10; return Math.max(0, Math.floor(v/s)*s); 
 function progData(){
   const L=LIFTS[progLift];
   const bw=pesoCorporal7d()||0;   // peso unificado (media 7 días de la pestaña Cuerpo)
-  const benchmark = bw ? nearestLoadable(bw*BENCH[progLift]) : null;
+  const EPLEY5=1+5/30;            // 5RM -> 1RM (Epley); dividimos para pasar el objetivo 1RM a carga de trabajo
+  const bench1RM = bw ? +(bw*BENCH[progLift]).toFixed(1) : null;   // objetivo del libro (a 1RM)
+  const benchmark = bench1RM ? nearestLoadable(bench1RM/EPLEY5) : null; // equivalente en tu peso de trabajo (5 reps)
   const startW=startWork(progLift);
   const pts=[]; let projCount=0;
   for(let s=1;s<=TOTAL_SESSIONS;s++){
@@ -1035,7 +1037,7 @@ function progData(){
     pts.push({s,w,done});
     if(!done){ projCount++; if(benchmark && w>=benchmark) break; if(!benchmark && projCount>=8) break; }
   }
-  return {L,bw,benchmark,startW,pts};
+  return {L,bw,benchmark,bench1RM,startW,pts};
 }
 function renderProgreso(){
   app.innerHTML=`<p class="eyebrow">Progreso</p>
@@ -1070,7 +1072,7 @@ function renderProgreso(){
 }
 function clampWin(n){ if(chartWin>n)chartWin=n; if(chartEnd==null)chartEnd=n-1; chartEnd=Math.min(n-1,Math.max(chartWin-1,chartEnd)); }
 function drawChart(d){
-  const {benchmark,startW,pts}=d, n=pts.length;
+  const {benchmark,bench1RM,startW,pts}=d, n=pts.length;
   if(chartWin===null||chartWin>n){ chartWin=n; chartEnd=n-1; }
   clampWin(n);
   const vis=pts.slice(chartEnd-chartWin+1, chartEnd+1), m=vis.length;
@@ -1090,10 +1092,10 @@ function drawChart(d){
   xl+=`<text x="${pX0-26}" y="${pY0+4}" fill="var(--faint)" font-size="8" font-family="Inter,sans-serif">kg</text>`;
   let bench='';
   if(benchmark && benchmark>=yMin && benchmark<=yMax){
-    const by=Y(benchmark), tagW=104, tagX=Math.max(pX0, pX1-tagW);
+    const by=Y(benchmark), tagW=134, tagX=Math.max(pX0, pX1-tagW);
     bench=`<line x1="${pX0}" y1="${by.toFixed(1)}" x2="${pX1}" y2="${by.toFixed(1)}" stroke="#3fae6a" stroke-width="1.7" stroke-dasharray="5 3"/>`+
       `<rect x="${tagX}" y="${(by-16).toFixed(1)}" width="${tagW}" height="13" rx="3" fill="#3fae6a"/>`+
-      `<text x="${tagX+tagW/2}" y="${(by-6).toFixed(1)}" fill="#0c140f" font-size="8.5" font-weight="700" text-anchor="middle" font-family="Inter,sans-serif">INTERMEDIO · ${benchmark} kg</text>`;
+      `<text x="${tagX+tagW/2}" y="${(by-6).toFixed(1)}" fill="#0c140f" font-size="8.5" font-weight="700" text-anchor="middle" font-family="Inter,sans-serif">INTERMEDIO · ${benchmark} kg${bench1RM?` (≈${bench1RM} a 1RM)`:''}</text>`;
   }
   const line=vis.map((p,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${Y(p.w).toFixed(1)}`).join(' ');
   const dots=vis.map((p,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(p.w).toFixed(1)}" r="${p.done?3.4:2.2}" fill="${p.done?'var(--warm)':'var(--faint)'}"/>`).join('');
@@ -1118,7 +1120,7 @@ function drawChart(d){
   svg.onpointerup=hide; svg.onpointercancel=hide; svg.onpointerleave=e=>{ if(!e.buttons) hide(); };
 }
 function renderStats(d){
-  const {L,benchmark,startW,pts}=d;
+  const {L,benchmark,bench1RM,startW,pts}=d;
   const frontier=lastCompletedSession()+1;
   let ns=frontier; while(ns<=TOTAL_SESSIONS && !appearsIn(L.day,ns)) ns++;
   const currentW = ns<=TOTAL_SESSIONS ? workWeight(progLift,ns) : pts[pts.length-1].w;
@@ -1127,13 +1129,14 @@ function renderStats(d){
   if(benchmark){
     const faltan=Math.max(0,+(benchmark-currentW).toFixed(2));
     const sesiones=faltan>0?Math.ceil(faltan/L.inc):0;
-    html=`<div class="stat-line"><span class="bench-key">▦ Objetivo intermedio (${BENCH[progLift]}× tu peso)</span><b>${benchmark} kg</b></div>
+    html=`<div class="stat-line"><span class="bench-key">▦ Objetivo intermedio (carga de trabajo)</span><b>${benchmark} kg</b></div>
+      <div class="stat-line">Equivale a (${BENCH[progLift]}× tu peso, a 1RM)<b>${bench1RM} kg</b></div>
       <div class="stat-line">Tu peso de trabajo actual<b>${currentW} kg</b></div>
       <div class="stat-line">Te faltan<b>${faltan>0?('+'+faltan+' kg'):'¡conseguido! 💪'}</b></div>
       ${faltan>0?`<div class="stat-line">Sesiones estimadas (subiendo limpio)<b>~${sesiones}</b></div>`:''}
       <div class="stat-line">Peso de partida<b>${startW} kg</b></div>
       <div class="stat-line">Sesiones completadas<b>${doneCount}</b></div>`;
-    if(progLift==='clean') html+=`<p class="tiny" style="margin-top:8px">El libro no da listón para el clean; 0,7× es una estimación orientativa.</p>`;
+    html+=`<p class="tiny" style="margin-top:8px">El listón del libro es a 1RM. Lo convertimos a tu carga de trabajo de 5 reps (Epley: 1RM ≈ trabajo × 1,167) para comparar en los mismos kilos que pones en la barra.${progLift==='clean'?' El clean no tiene listón oficial: 0,7× es orientativo.':''}</p>`;
   } else {
     html=`<div class="stat-line">Peso de partida<b>${startW} kg</b></div>
       <div class="stat-line">Tu peso de trabajo actual<b>${currentW} kg</b></div>
