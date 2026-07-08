@@ -1156,8 +1156,18 @@ function daysBetween(aIso,bIso){ return Math.round((isoToDate(bIso)-isoToDate(aI
 function formatEs(iso){ return isoToDate(iso).toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'}); }
 function todayIso(){ return new Date().toISOString().slice(0,10); }
 
-const TRAIN_OFFSETS=[0,2,4,5];                 // días de entreno dentro de cada bloque de 7
-function offsetOfIndex(i){ return Math.floor(i/4)*7 + TRAIN_OFFSETS[i%4]; }
+// Huecos entre entrenamientos: 1 día antes de un HIIT (va pegado a la 3ª fuerza),
+// 2 días (un descanso) antes de una fuerza. Se calcula sobre la secuencia REAL,
+// no sobre una plantilla fija, así nunca caen dos fuerzas seguidas al reanudar a media semana.
+function seqOffsets(seq){
+  const offs=[]; let cur=0;
+  for(let i=0;i<seq.length;i++){
+    offs.push(cur);
+    const next=seq[i+1];
+    cur += (next && next.type==='hiit') ? 1 : 2;
+  }
+  return offs;
+}
 // Secuencia ordenada de lo que queda por entrenar (fuerza + HIIT, en orden de microciclo)
 function remainingSequence(){
   const seq=[];
@@ -1171,8 +1181,9 @@ function remainingSequence(){
 function resumeIso(){ const t=todayIso(); return (S.cfg.resumeDate && S.cfg.resumeDate>=t) ? S.cfg.resumeDate : t; }
 function projectedMap(){
   const start=resumeIso(), seq=remainingSequence(), map={};
-  seq.forEach((t,i)=>{ const dt=isoToDate(start); dt.setDate(dt.getDate()+offsetOfIndex(i)); map[dateToIso(dt)]={...t}; });
-  const endIso = seq.length ? (()=>{ const dt=isoToDate(start); dt.setDate(dt.getDate()+offsetOfIndex(seq.length-1)); return dateToIso(dt); })() : null;
+  const offs=seqOffsets(seq);
+  seq.forEach((t,i)=>{ const dt=isoToDate(start); dt.setDate(dt.getDate()+offs[i]); map[dateToIso(dt)]={...t}; });
+  const endIso = seq.length ? (()=>{ const dt=isoToDate(start); dt.setDate(dt.getDate()+offs[seq.length-1]); return dateToIso(dt); })() : null;
   return {map, start, endIso, seq};
 }
 function completedMap(){
