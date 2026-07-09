@@ -177,6 +177,22 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
   font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .cbtn:active{background:var(--surface-2)}
 .bench-key{color:#3fae6a;font-weight:600}
+/* Vista de conjunto de avance */
+.ov-wrap{display:flex;flex-direction:column;gap:11px}
+.ov-row{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:11px 12px;cursor:pointer}
+.ov-row.cur{border-color:var(--accent)}
+.ov-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+.ov-name{font-family:'Barlow Condensed';font-weight:700;font-size:16px;text-transform:uppercase}
+.ov-est{font-size:9px;color:var(--faint);font-weight:600}
+.ov-pcts{font-family:'Barlow Condensed';font-weight:700;font-size:17px;color:var(--accent)}
+.ov-sep{color:var(--faint)}
+.ov-sobre{color:var(--muted);font-size:14px}
+.ov-bar{position:relative;height:8px;background:var(--surface-2);border-radius:99px;overflow:hidden}
+.ov-ghost{position:absolute;left:0;top:0;height:100%;background:rgba(255,179,122,.22);border-radius:99px}
+.ov-fill{position:absolute;left:0;top:0;height:100%;background:linear-gradient(90deg,var(--accent-deep),var(--accent));border-radius:99px;z-index:2}
+.ov-sub{margin-top:6px;font-size:12px;color:var(--muted)}
+.ov-sub b{color:var(--text)}
+.ov-warn{color:#e0594e;font-weight:600}
 /* Línea "última vez -> hoy" en cada ejercicio */
 .prevline{font-size:12.5px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin-bottom:11px}
 .prevline b{color:var(--text)}
@@ -1039,9 +1055,50 @@ function progData(){
   }
   return {L,bw,benchmark,bench1RM,startW,pts};
 }
+/* Vista de conjunto: avance de todos los ejercicios hacia el nivel intermedio.
+   Dos porcentajes:
+   - Camino recorrido: (actual - partida)/(objetivo - partida) -> empiezas en 0%, llegas al 100%.
+   - Sobre objetivo:   actual/objetivo -> qué fracción del listón mueves ya.  */
+function overviewData(){
+  const bw=pesoCorporal7d()||0; if(!bw) return null;
+  const EPLEY5=1+5/30;
+  const frontier=lastCompletedSession()+1;
+  return Object.keys(LIFTS).map(k=>{
+    const L=LIFTS[k];
+    const b1=+(bw*BENCH[k]).toFixed(1), obj=nearestLoadable(b1/EPLEY5), ini=startWork(k);
+    let ns=frontier; while(ns<=TOTAL_SESSIONS && !appearsIn(L.day,ns)) ns++;
+    const act = ns<=TOTAL_SESSIONS ? workWeight(k,ns) : ini;
+    const camino = obj>ini ? Math.max(0,Math.min(100, (act-ini)/(obj-ini)*100)) : 100;
+    const sobre  = Math.max(0,Math.min(100, act/obj*100));
+    const fails=consecutiveFails(k);
+    return {k, label:L.label, ini, act, obj, b1, camino, sobre, fails, est:k==='clean'};
+  }).sort((a,b)=>b.camino-a.camino);
+}
+function overviewHTML(){
+  const rows=overviewData();
+  if(!rows) return `<div class="note">Introduce tu <b>peso</b> en la pestaña <b>Cuerpo</b> para ver tu avance hacia el nivel intermedio.</div>`;
+  const real=rows.filter(r=>!r.est);
+  const lider=real[0], farol=real[real.length-1];
+  return `<div class="ov-wrap">
+    ${rows.map(r=>`
+      <div class="ov-row ${r.k===progLift?'cur':''}" data-ovk="${r.k}">
+        <div class="ov-head"><span class="ov-name">${r.label}${r.est?' <span class="ov-est">est.</span>':''}</span>
+          <span class="ov-pcts"><b>${r.camino.toFixed(0)}%</b> <span class="ov-sep">·</span> <span class="ov-sobre">${r.sobre.toFixed(0)}%</span></span></div>
+        <div class="ov-bar"><div class="ov-fill" style="width:${r.camino.toFixed(1)}%"></div>
+          <div class="ov-ghost" style="width:${r.sobre.toFixed(1)}%"></div></div>
+        <div class="ov-sub">${r.ini} → <b>${r.act} kg</b> · objetivo ${r.obj} kg${r.fails>=2?` · <span class="ov-warn">⚠️ ${r.fails} fallos seguidos</span>`:''}</div>
+      </div>`).join('')}
+    <p class="tiny" style="margin-top:6px"><b>${real.length?real[0].camino.toFixed(0):0}%</b> = <b>camino recorrido</b> desde tu peso de partida hasta el listón. El segundo, más claro, es la <b>fracción del objetivo</b> que ya mueves.</p>
+    ${real.length>1?`<div class="note" style="margin-top:8px">Más adelantado: <b>${lider.label}</b> (${lider.camino.toFixed(0)}%). Más rezagado: <b>${farol.label}</b> (${farol.camino.toFixed(0)}%). Que los empujes vayan más lentos es <b>normal</b>: suben la mitad por sesión y mueven menos masa. No es un fallo tuyo.</div>`:''}
+  </div>`;
+}
 function renderProgreso(){
   app.innerHTML=`<p class="eyebrow">Progreso</p>
     <h2 class="h-big" style="font-size:24px">Camino al nivel intermedio</h2>
+    <p class="eyebrow" style="margin-top:14px">Todos los movimientos</p>
+    ${overviewHTML()}
+    <hr class="sep">
+    <p class="eyebrow">Detalle</p>
     <div class="progress-pick" id="pick">
       ${Object.entries(LIFTS).map(([k,L])=>`<button data-k="${k}" class="${k===progLift?'sel':''}">${L.label}</button>`).join('')}
     </div>
@@ -1059,6 +1116,7 @@ function renderProgreso(){
     <p class="tiny center" style="margin-top:2px">Toca o arrastra la gráfica para ver cada valor · usa +/− para acercar</p>
     <div id="pstats" style="margin-top:14px"></div>`;
   document.querySelectorAll('#pick button').forEach(b=>b.onclick=()=>{ progLift=b.dataset.k; chartWin=null; chartEnd=null; renderProgreso(); });
+  document.querySelectorAll('[data-ovk]').forEach(r=>r.onclick=()=>{ progLift=r.dataset.ovk; chartWin=null; chartEnd=null; renderProgreso(); });
   const d=progData();
   const redraw=()=>drawChart(d);
   redraw();
@@ -1177,13 +1235,41 @@ function remainingSequence(){
   }
   return seq;
 }
-// Fecha desde la que se reparte lo pendiente: la que fijes (si es futura) o hoy
-function resumeIso(){ const t=todayIso(); return (S.cfg.resumeDate && S.cfg.resumeDate>=t) ? S.cfg.resumeDate : t; }
+// Fecha del último entrenamiento REAL (fuerza o HIIT), para no pisar días ya entrenados
+function lastTrainedIso(){
+  const ds=[];
+  Object.values(S.logs).forEach(l=>{ if(l&&l.date) ds.push(l.date); });
+  Object.values(S.hiit).forEach(h=>{ if(h&&h.date&&h.done) ds.push(h.date); });
+  return ds.length? ds.sort()[ds.length-1] : null;
+}
+// Fecha desde la que se reparte lo pendiente:
+//  - nunca antes de hoy
+//  - nunca el mismo día que ya entrenaste: se respeta el hueco (1 día si toca HIIT, 2 si toca fuerza)
+//  - si fijaste una fecha de reanudación futura, manda esa
+function resumeIso(){
+  const t=todayIso(), seq=remainingSequence();
+  let earliest=t;
+  const last=lastTrainedIso();
+  if(last){
+    const gap=(seq[0] && seq[0].type==='hiit') ? 1 : 2;
+    const dt=isoToDate(last); dt.setDate(dt.getDate()+gap);
+    const afterRest=dateToIso(dt);
+    if(afterRest>earliest) earliest=afterRest;
+  }
+  if(S.cfg.resumeDate && S.cfg.resumeDate>=t && S.cfg.resumeDate>earliest) return S.cfg.resumeDate;
+  return earliest;
+}
 function projectedMap(){
   const start=resumeIso(), seq=remainingSequence(), map={};
   const offs=seqOffsets(seq);
-  seq.forEach((t,i)=>{ const dt=isoToDate(start); dt.setDate(dt.getDate()+offs[i]); map[dateToIso(dt)]={...t}; });
-  const endIso = seq.length ? (()=>{ const dt=isoToDate(start); dt.setDate(dt.getDate()+offs[seq.length-1]); return dateToIso(dt); })() : null;
+  const done=completedMap();
+  let endIso=null;
+  seq.forEach((t,i)=>{
+    const dt=isoToDate(start); dt.setDate(dt.getDate()+offs[i]);
+    let iso=dateToIso(dt);
+    while(done[iso]){ dt.setDate(dt.getDate()+1); iso=dateToIso(dt); } // nunca pisar un día ya entrenado
+    map[iso]={...t}; endIso=iso;
+  });
   return {map, start, endIso, seq};
 }
 function completedMap(){
