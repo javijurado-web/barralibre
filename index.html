@@ -109,6 +109,20 @@ nav button.active{color:var(--accent)}
 .o3-note textarea{width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px;font-size:15px;font-family:inherit}
 .stall-note{background:rgba(224,89,78,.1);border:1px solid rgba(224,89,78,.35);border-radius:9px;padding:10px 12px;font-size:13px;color:var(--warm);margin:8px 0}
 .stall-note b{color:#e0594e}
+/* Diálogo de descarga guiada */
+.deload-box{max-width:380px;max-height:85vh;overflow-y:auto}
+.dl-title{font-family:'Barlow Condensed';font-weight:800;font-size:21px;text-transform:uppercase;margin:0 0 8px;color:#e0594e}
+.dl-intro{font-size:13.5px;color:var(--muted);margin:0 0 14px}
+.dl-cause{display:flex;gap:10px;align-items:flex-start;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:11px;margin-bottom:8px;font-size:13px;color:var(--muted);cursor:pointer}
+.dl-cause input{width:20px;height:20px;flex:none;margin-top:1px;accent-color:var(--accent)}
+.dl-cause b{color:var(--text)}
+.dl-tip{background:rgba(255,107,26,.1);border:1px solid rgba(255,107,26,.3);border-radius:9px;padding:9px 11px;font-size:12.5px;color:var(--warm);margin:8px 0}
+.dl-cause4{background:rgba(224,89,78,.08);border:1px solid rgba(224,89,78,.3);border-radius:10px;padding:12px;margin:10px 0 4px;font-size:13.5px}
+.dl-prev{background:var(--bg);border-radius:8px;padding:9px 11px;margin:8px 0 6px;font-size:14px;line-height:1.7}
+.dl-prev b{color:var(--warm)}
+.dl-btns{display:flex;gap:8px;margin-top:14px}
+.dl-btns .btn{margin:0}
+.dl-btns .btn:disabled{opacity:.4}
 
 /* ---- Series ---- */
 .set-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--surface-2)}
@@ -193,6 +207,23 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .ov-sub{margin-top:6px;font-size:12px;color:var(--muted)}
 .ov-sub b{color:var(--text)}
 .ov-warn{color:#e0594e;font-weight:600}
+/* HIIT: rejilla de repeticiones por ronda */
+.hiit-grid{display:grid;gap:6px;align-items:center}
+.hg-h{font-family:'Barlow Condensed';font-weight:700;font-size:12px;text-transform:uppercase;color:var(--muted);text-align:center}
+.hg-r{font-family:'Barlow Condensed';font-weight:700;font-size:14px;color:var(--warm);text-align:center;min-width:26px}
+.hg-r.tot{color:var(--accent)}
+.hg-i{width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--text);
+  padding:9px 4px;font-size:16px;text-align:center;font-family:inherit}
+.hg-i:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.hg-t{font-family:'Barlow Condensed';font-weight:800;font-size:18px;color:var(--accent);text-align:center}
+/* Cronómetro guiado HIIT */
+.hiit-timer{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom));
+  background:var(--accent);color:#160a02;border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:14px;
+  box-shadow:0 8px 28px rgba(0,0,0,.5);z-index:60;min-width:230px}
+.hiit-timer.rest{background:#3fae6a;color:#0c140f}
+.ht-lab{font-family:'Barlow Condensed';font-weight:700;font-size:15px;text-transform:uppercase;flex:1}
+.ht-time{font-family:'Barlow Condensed';font-weight:800;font-size:26px;font-variant-numeric:tabular-nums}
+.ht-x{background:rgba(0,0,0,.18);border:none;color:inherit;width:26px;height:26px;border-radius:50%;font-size:13px;cursor:pointer}
 /* Línea "última vez -> hoy" en cada ejercicio */
 .prevline{font-size:12.5px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin-bottom:11px}
 .prevline b{color:var(--text)}
@@ -407,13 +438,18 @@ const ACCESSORIES = {
 /* HIIT: sesión semanal independiente que rota 1→4. Datos funcionales
    (rondas y movimientos) del programa; detalle completo en el libro p.169-170. */
 const HIIT = {
-  1:{tag:'HIIT 01', tipo:'Calistenia', desc:'3 rondas · al menor tiempo posible',
-     items:['10 dominadas','20 flexiones','30 sentadillas','40 escaladores (20 por pierna)','50 saltos de cuerda (o 50 elevaciones de rodilla)']},
-  2:{tag:'HIIT 02', tipo:'Calistenia', desc:'5 rondas',
+  1:{tag:'HIIT 01', tipo:'Calistenia', desc:'3 rondas · al menor tiempo posible', modo:'tiempo', rondas:3,
+     nota:'Sin descanso marcado: completa las 3 rondas lo más rápido que puedas, descansando solo lo justo. Tu marca es el TIEMPO.',
+     items:['10 dominadas (divídelas en las menos tandas posibles)','20 flexiones','30 sentadillas','40 escaladores (20 por pierna)','50 saltos de cuerda (o 50 elevaciones de rodilla)']},
+  2:{tag:'HIIT 02', tipo:'Calistenia', desc:'5 rondas × 4 min · 20 min exactos', modo:'reps', rondas:5,
+     ejercicios:[{id:'sent',lab:'Sentadilla'},{id:'flex',lab:'Flexiones'},{id:'burp',lab:'Burpees'}],
+     nota:'Cada ronda: 1 min de sentadilla + 1 min de flexiones + 1 min de burpees + 1 min de descanso. El tiempo es fijo (20 min): tu marca son las REPETICIONES.',
      items:['Sentadilla — 1 min','Flexiones — 1 min','Burpees — 1 min','Descanso — 1 min']},
-  3:{tag:'HIIT 03', tipo:'Kettlebell', desc:'3 rondas · descanso 1 min entre rondas',
-     items:['10 thrusters','15 swings','20 flexiones','30 sentadillas','15 burpees','10 snatches']},
-  4:{tag:'HIIT 04', tipo:'Kettlebell', desc:'3 rondas · descanso 1 min entre rondas',
+  3:{tag:'HIIT 03', tipo:'Kettlebell', desc:'3 rondas · descanso 1 min entre rondas', modo:'tiempo', rondas:3,
+     nota:'Reps fijas, con 1 min de descanso entre rondas. Tu marca es el TIEMPO total.',
+     items:['10 thrusters','15 swings','20 flexiones','30 sentadillas (sin peso)','15 burpees','10 snatches']},
+  4:{tag:'HIIT 04', tipo:'Kettlebell', desc:'3 rondas · descanso 1 min entre rondas', modo:'tiempo', rondas:3,
+     nota:'Reps fijas, con 1 min de descanso entre rondas. Tu marca es el TIEMPO total.',
      items:['5 snatches por lado','5 thrusters por lado','10 flexiones','5 high pulls por lado','10 dominadas','5 squats en rack por lado','5 swings a una mano por lado','10 burpees','5 clean & press por lado','10 fondos en paralelas']}
 };
 
@@ -430,6 +466,7 @@ const KEY='barralibre_v1';
 let S = load();
 if(!S.hiit) S.hiit={};   // migración para guardados anteriores
 if(!S.cfg.nutri) S.cfg.nutri={};
+if(!S.cfg.deloads) S.cfg.deloads={};
 // Actualiza el juego de discos SOLO si tenías el set anterior por defecto (no pisa uno personalizado)
 if(S.cfg.plates && S.cfg.plates.join(',')==='20,10,5,2.5,1.25,1,0.5'){ S.cfg.plates=[25,20,15,10,5,2.5,2,1.5,1,0.5]; save(); }
 if(lastCompletedSession()===0) S.current=1;  // sin historial -> empezar en Sesión 1 (día A)
@@ -511,42 +548,52 @@ function prevAppearance(liftKey, s){
 
 /* ¿Falló este ejercicio en la sesión s? */
 function liftFailed(s, liftKey){ const o=S.logs[s]&&S.logs[s].out&&S.logs[s].out[liftKey]; return !!(o&&o.r==='fallo'); }
-/* Incremento ganado en una sesión registrada, según el resultado (regla del libro):
-   limpio = incremento completo · forzado = mitad · fallo = 0 (repite peso) */
-function incEarned(liftKey, p){
-  const L=LIFTS[liftKey];
+
+/* ---- DESCARGAS por ejercicio (estancamiento) ----
+   Cada descarga es un evento {session, weight, inc}: a partir de esa aparición, el peso
+   base pasa a 'weight' (−10%) y el incremento a 'inc' (la mitad). Así el historial previo
+   se conserva y desde el evento se recalcula con las reglas nuevas. */
+function deloadsFor(liftKey){ return (S.cfg.deloads && S.cfg.deloads[liftKey]) || []; }
+function currentInc(liftKey){ const d=deloadsFor(liftKey); return d.length ? d[d.length-1].inc : LIFTS[liftKey].inc; }
+function lastDeloadSession(liftKey){ const d=deloadsFor(liftKey); return d.length ? d[d.length-1].session : 1; }
+/* Incremento ganado en la sesión p con un incremento base dado (limpio=inc, forzado=½, fallo=0) */
+function incEarnedWith(liftKey, p, inc){
   const o=S.logs[p]&&S.logs[p].out&&S.logs[p].out[liftKey];
-  const r=o?o.r:'limpio';                 // registrada sin marcar = se considera limpio
+  const r=o?o.r:'limpio';
   if(r==='fallo') return 0;
-  if(r==='forzado') return L.inc/2;
-  return L.inc;
+  if(r==='forzado') return inc/2;
+  return inc;
 }
+function incEarned(liftKey, p){ return incEarnedWith(liftKey, p, currentInc(liftKey)); }
 /* Nº de apariciones del ejercicio en [desde, hasta) */
 function appearancesBetween(liftKey, desde, hasta){
   const day=LIFTS[liftKey].day; let n=0;
   for(let p=desde;p<hasta;p++) if(appearsIn(day,p)) n++;
   return n;
 }
-/* Fallos consecutivos más recientes (para detectar estancamiento) */
+/* Fallos consecutivos más recientes, contando solo DESPUÉS de la última descarga */
 function consecutiveFails(liftKey){
-  const day=LIFTS[liftKey].day, apps=[];
-  for(let p=1;p<=TOTAL_SESSIONS;p++) if(appearsIn(day,p)&&sessionLogged(p)) apps.push(p);
+  const day=LIFTS[liftKey].day, since=lastDeloadSession(liftKey), apps=[];
+  for(let p=since;p<=TOTAL_SESSIONS;p++) if(appearsIn(day,p)&&sessionLogged(p)) apps.push(p);
   let c=0; for(let i=apps.length-1;i>=0;i--){ if(liftFailed(apps[i],liftKey)) c++; else break; }
   return c;
 }
 
-/* PESO DE TRABAJO — parte del peso inicial y SUMA el incremento ganado en cada
-   sesión registrada anterior (completo, medio o cero según el resultado).
-   Para sesiones futuras se proyecta asumiendo "limpio". */
+/* PESO DE TRABAJO — camina las apariciones desde la 1, arrancando en el peso inicial e
+   incremento del libro, aplicando cada descarga a su llegada (peso −10%, incremento ½).
+   Sesiones registradas usan tu resultado real; futuras se proyectan como "limpio". */
 function workWeight(liftKey, s){
   const L=LIFTS[liftKey];
   if(!appearsIn(L.day, s)) return null;
-  const frontier = lastCompletedSession()+1;
-  let w=startWork(liftKey);
-  const upto = (s<=frontier) ? s : frontier;
-  for(let p=1;p<upto;p++) if(appearsIn(L.day,p)&&sessionLogged(p)) w+=incEarned(liftKey,p);
-  if(s>frontier) w += appearancesBetween(liftKey, frontier, s)*L.inc; // proyección optimista
-  return w;
+  const dls=deloadsFor(liftKey);
+  let w=startWork(liftKey), inc=LIFTS[liftKey].inc;
+  for(let p=1;p<=s;p++){
+    if(!appearsIn(L.day,p)) continue;
+    const dl=dls.find(d=>d.session===p); if(dl){ w=dl.weight; inc=dl.inc; }
+    if(p===s) return Math.round(w*100)/100;
+    w += incEarnedWith(liftKey,p,inc);
+  }
+  return Math.round(w*100)/100;
 }
 
 // Rampa de calentamiento según tipo (porcentajes del Excel)
@@ -749,7 +796,7 @@ function renderHoy(){
         afectados.forEach(L=>{
           const o=log.out[L.key];
           if(o.r==='fallo') msg+=`• ${L.label} — FALLO: la próxima vez repites ${L.W} kg (no subes)\n`;
-          else { const nw=nearestLoadable(L.W+LIFTS[L.key].inc/2); msg+=`• ${L.label} — FORZADO: la próxima vez +${+(nw-L.W).toFixed(2)} kg → ${nw} kg\n`; }
+          else { const nw=nearestLoadable(L.W+currentInc(L.key)/2); msg+=`• ${L.label} — FORZADO: la próxima vez +${+(nw-L.W).toFixed(2)} kg → ${nw} kg\n`; }
         });
         msg+='\nEsto se aplicará a partir de ahora. ¿Guardar?';
         askConfirm(msg, guardar, 'Guardar');
@@ -790,6 +837,58 @@ function warmupGeneralHTML(){
       <p class="tiny">Después, cada ejercicio ya trae sus series de calentamiento con peso creciente. 📖 pág. 109-110</p>
     </div></div>`;
 }
+/* ---- DIAGNÓSTICO DE ESTANCAMIENTO + DESCARGA GUIADA (fiel al libro) ---- */
+function nextAppearanceOf(liftKey){
+  const day=LIFTS[liftKey].day; const frontier=lastCompletedSession()+1;
+  let s=frontier; while(s<=TOTAL_SESSIONS && !appearsIn(day,s)) s++;
+  return s<=TOTAL_SESSIONS ? s : frontier;
+}
+function trainingWeeks(){
+  const ds=Object.values(S.logs).filter(l=>l&&l.date).map(l=>l.date).sort();
+  if(ds.length<2) return 0;
+  return Math.round((new Date(ds[ds.length-1])-new Date(ds[0]))/86400000/7);
+}
+function openDeloadDialog(liftKey){
+  const L=LIFTS[liftKey];
+  const ns=nextAppearanceOf(liftKey);
+  const curW=nearestLoadable(workWeight(liftKey, ns));
+  const curInc=currentInc(liftKey);
+  const newW=nearestLoadable(curW*0.9);
+  const newInc=curInc/2;
+  const esPress = (liftKey==='banca'||liftKey==='militar');
+  const semanas=trainingWeeks();
+  const ov=document.getElementById('deload-modal')||document.createElement('div');
+  ov.id='deload-modal'; ov.className='modal show';
+  ov.innerHTML=`<div class="modal-box deload-box">
+    <h3 class="dl-title">Estancamiento en ${L.label}</h3>
+    <p class="dl-intro">Llevas ${consecutiveFails(liftKey)} fallos seguidos. El libro da <b>4 causas</b>. Descarta las tres primeras antes de descargar: la descarga es el último recurso, no el primero.</p>
+    <label class="dl-cause"><input type="checkbox" data-c="1"> <span><b>1 · ¿Comes suficiente?</b> Estás en tu rango de calorías (±5%). En definición es más fácil estancarse; prueba a subir un poco las calorías unos días.</span></label>
+    <label class="dl-cause"><input type="checkbox" data-c="2"> <span><b>2 · ¿Descansas suficiente?</b> Duermes 7-8 h y no metes cardio/CrossFit extra que te sabotee la recuperación.</span></label>
+    <label class="dl-cause"><input type="checkbox" data-c="3"> <span><b>3 · ¿Te mueves bien?</b> Has revisado tu técnica (grábate de frente y de lado, a cámara lenta). Muchos atascos son de movilidad.</span></label>
+    ${esPress?`<div class="dl-tip">💡 Es un press: prueba a moverlo al <b>principio de la sesión</b> un par de veces, para atacarlo fresco, antes de descargar.</div>`:''}
+    <div class="dl-cause4">
+      <b>4 · Descargar</b> — un paso atrás para tomar impulso:
+      <div class="dl-prev">Peso: <b>${curW} → ${newW} kg</b> (−10%)<br>Incremento: <b>${curInc} → ${newInc} kg</b> (la mitad)</div>
+      <span class="tiny">Se aplicará desde tu próxima ${L.label.toLowerCase()} (sesión ${ns}). El historial anterior se conserva.</span>
+    </div>
+    ${semanas>8?`<div class="dl-tip">📅 Llevas ~${semanas} semanas seguidas: el libro recomienda además una <b>semana de descarga completa</b> (mismas series/reps al 60% de tu 5RM). Valóralo.</div>`:''}
+    <div class="dl-btns">
+      <button class="btn ghost" id="dlCancel">Cancelar</button>
+      <button class="btn" id="dlApply" disabled>Aplicar descarga</button>
+    </div>
+  </div>`;
+  if(!ov.parentElement) document.body.appendChild(ov);
+  const chks=[...ov.querySelectorAll('[data-c]')], apply=ov.querySelector('#dlApply');
+  const refresh=()=>{ apply.disabled = !chks.every(c=>c.checked); };
+  chks.forEach(c=>c.onchange=refresh);
+  ov.querySelector('#dlCancel').onclick=()=>ov.classList.remove('show');
+  apply.onclick=()=>{
+    S.cfg.deloads=S.cfg.deloads||{}; S.cfg.deloads[liftKey]=S.cfg.deloads[liftKey]||[];
+    S.cfg.deloads[liftKey].push({session:ns, weight:newW, inc:newInc});
+    save(); ov.classList.remove('show'); render(); window.scrollTo(0,0);
+    toast(`Descarga aplicada en ${L.label}: ${newW} kg, +${newInc}`);
+  };
+}
 function liftCard(L,lg){
   const div=document.createElement('div'); div.className='card';
   const allDone=L.sets.every((_,i)=>lg.sets[setKey(L.key,i)]);
@@ -814,7 +913,8 @@ function liftCard(L,lg){
           <button class="tick ${lg.sets[setKey(L.key,i)]?'on':''}" data-lift="${L.key}" data-i="${i}" data-work="${st.work?1:0}">✓</button>
         </div>`).join('')}
       ${barbellHTML(L.W)}
-      ${stalled?`<div class="stall-note">⚠️ Llevas 3 fallos seguidos en ${L.label}: estás <b>estancado</b>. Toca <b>descarga</b> (la añadimos en el siguiente paso).</div>`:''}
+      ${stalled?`<div class="stall-note">⚠️ Llevas ${consecutiveFails(L.key)} fallos seguidos en ${L.label}: estás <b>estancado</b>.
+        <button class="btn ghost" style="margin-top:8px" onclick="openDeloadDialog('${L.key}')">Diagnosticar estancamiento →</button></div>`:''}
       <div class="outcome3-wrap">
         <span class="out-q">¿Cómo te fue con ${L.W} kg?</span>
         <div class="outcome3">
@@ -866,7 +966,7 @@ function outcomeBadge(r,allDone){
   return '';
 }
 function nextPreview(lift, r, curW){
-  const inc=LIFTS[lift].inc;
+  const inc=currentInc(lift);
   if(r==='fallo') return `Si lo guardas así · próxima vez: <b>mismo peso, ${curW} kg</b> (lo repites)`;
   const delta=(r==='forzado')?inc/2:inc;
   const nextW=nearestLoadable(curW+delta);
@@ -939,49 +1039,112 @@ function accCard(a,lg){
 
 /* Tarjeta de HIIT semanal: misma sesión durante toda la semana (recordatorio),
    se registra una vez. El número rota 1→4 según la semana. */
+/* Última vez que hiciste ESTE mismo HIIT (mismo número), para superarte */
+function prevHiit(hiitNum, currentWeek){
+  const ws=Object.keys(S.hiit).map(Number)
+    .filter(w=>w<currentWeek && S.hiit[w].done && hiitOfWeek(w)===hiitNum).sort((a,b)=>b-a);
+  return ws.length? {w:ws[0], log:S.hiit[ws[0]]} : null;
+}
+function hiitPrevLine(num, w, def){
+  const p=prevHiit(num, w); if(!p) return '';
+  const l=p.log;
+  if(def.modo==='reps' && l.reps){
+    const tot=def.ejercicios.map(e=>{ let s=0; for(let r=0;r<def.rondas;r++) s+=(+(l.reps[e.id+r])||0); return `${e.lab} ${s}`; }).join(' · ');
+    return `<div class="prevline">Última vez (sem ${p.w}): <b>${tot}</b> · supérate un poquito 💪</div>`;
+  }
+  if(l.res) return `<div class="prevline">Última vez (sem ${p.w}): <b>${l.res}</b> · a batirlo 💪</div>`;
+  return '';
+}
 function hiitCard(){
-  const w=currentHiitWeek(); const def=HIIT[hiitOfWeek(w)];
-  const log=S.hiit[w]||{};
+  const w=currentHiitWeek(); const num=hiitOfWeek(w); const def=HIIT[num];
+  const log=S.hiit[w]||{}; const reps=log.reps||{};
   const div=document.createElement('div'); div.className='card open';
+  let registro;
+  if(def.modo==='reps'){
+    registro=`<p class="eyebrow" style="margin-top:8px">Repeticiones por ronda</p>
+      <div class="hiit-grid" style="grid-template-columns:auto repeat(${def.ejercicios.length},1fr)">
+        <div class="hg-h"></div>${def.ejercicios.map(e=>`<div class="hg-h">${e.lab}</div>`).join('')}
+        ${Array.from({length:def.rondas},(_,r)=>`
+          <div class="hg-r">R${r+1}</div>
+          ${def.ejercicios.map(e=>`<input class="hg-i" type="number" inputmode="numeric" data-rep="${e.id}${r}" value="${reps[e.id+r]??''}" placeholder="—">`).join('')}
+        `).join('')}
+        <div class="hg-r tot">Σ</div>${def.ejercicios.map(e=>`<div class="hg-t" data-tot="${e.id}">0</div>`).join('')}
+      </div>
+      <div class="acc-input" style="margin-top:10px"><span>Cronómetro guiado</span>
+        <button class="btn ghost" id="hiitTimer" style="width:auto;padding:8px 14px;margin:0">▶ 20 min</button></div>`;
+  } else {
+    registro=`<div class="acc-input" style="margin-top:8px"><span>Tiempo total</span>
+        <input class="inline-num" id="hiitres" type="text" value="${log.res||''}" placeholder="p. ej. 14:30" style="width:120px;text-align:left"></div>`;
+  }
   div.innerHTML=`
     <div class="card-head"><div class="left"><span class="ex-name" style="font-size:17px">${def.tag}</span></div>
       <span class="ex-scheme">${def.tipo} · ${log.done?'✓ hecho':'1×/semana'}</span></div>
     <div class="card-body">
-      <p class="tiny" style="margin-top:2px;color:var(--warm)">${def.desc} · <b style="color:var(--accent)">sesión de día aparte, sin fuerza</b></p>
-      <ul style="margin:6px 0 10px;padding-left:18px;color:var(--text);font-size:14px;line-height:1.7">
+      <p class="tiny" style="margin-top:2px;color:var(--warm)">${def.desc} · <b style="color:var(--accent)">día aparte, sin fuerza</b></p>
+      ${hiitPrevLine(num,w,def)}
+      <ul style="margin:6px 0 8px;padding-left:18px;color:var(--text);font-size:14px;line-height:1.7">
         ${def.items.map(x=>`<li>${x}</li>`).join('')}</ul>
-      <div class="acc-input"><span>Resultado</span>
-        <input class="inline-num" id="hiitres" type="text" value="${log.res||''}" placeholder="tiempo o reps" style="width:130px;text-align:left">
-        <span>· Hecho</span>
-        <button class="tick ${log.done?'on':''}" id="hiitdone">✓</button></div>
-      <div class="acc-input" style="margin-top:4px"><span>Día realizado</span>
+      <div class="note" style="font-size:12.5px;margin:6px 0">${def.nota}</div>
+      ${registro}
+      <div class="acc-input" style="margin-top:8px"><span>Día realizado</span>
         <input id="hiitdate" type="date" value="${log.date||''}" style="width:auto"></div>
       <div class="help" style="margin-top:6px"><b>Idealmente el sábado</b>, en un día sin fuerza.
-        <span class="pageref">📖 pág. 169 — sin kettlebells, rota solo HIIT 01 y 02</span></div>
+        <span class="pageref">📖 pág. 169-170 — sin kettlebells, rota solo HIIT 01 y 02</span></div>
     </div>`;
   div.querySelector('.card-head').onclick=()=>div.classList.toggle('open');
-  div.querySelector('#hiitres').addEventListener('change',e=>{
-    S.hiit[w]={...(S.hiit[w]||{}), res:e.target.value, tag:def.tag}; save();
-  });
+  const totales=()=>{ if(def.modo!=='reps') return;
+    def.ejercicios.forEach(e=>{ let s=0; for(let r=0;r<def.rondas;r++) s+=(+(div.querySelector(`[data-rep="${e.id}${r}"]`).value)||0);
+      div.querySelector(`[data-tot="${e.id}"]`).textContent=s; }); };
+  div.querySelectorAll('[data-rep]').forEach(i=>i.addEventListener('input',()=>{
+    const cur=S.hiit[w]||{}; cur.reps=cur.reps||{}; const v=i.value.trim();
+    if(v==='') delete cur.reps[i.dataset.rep]; else cur.reps[i.dataset.rep]=+v;
+    cur.tag=def.tag; S.hiit[w]=cur; save(); totales();
+  }));
+  totales();
+  const resEl=div.querySelector('#hiitres');
+  if(resEl) resEl.addEventListener('change',e=>{ S.hiit[w]={...(S.hiit[w]||{}), res:e.target.value, tag:def.tag}; save(); });
   div.querySelector('#hiitdate').addEventListener('change',e=>{
-    S.hiit[w]={...(S.hiit[w]||{}), date:e.target.value, tag:def.tag}; save();
-  });
-  div.querySelector('#hiitdone').onclick=()=>{
-    const cur=S.hiit[w]||{}; cur.done=!cur.done; cur.tag=def.tag;
-    if(cur.done && !cur.date) cur.date=new Date().toISOString().slice(0,10);
-    S.hiit[w]=cur; save(); div.querySelector('#hiitdone').classList.toggle('on');
-    div.querySelector('.ex-scheme').textContent=`${def.tipo} · ${cur.done?'✓ hecho':'1×/semana'}`;
-    const di=div.querySelector('#hiitdate'); if(cur.date) di.value=cur.date;
-  };
+    S.hiit[w]={...(S.hiit[w]||{}), date:e.target.value, tag:def.tag}; save(); });
+  const tBtn=div.querySelector('#hiitTimer');
+  if(tBtn) tBtn.onclick=()=>startHiitTimer(def);
   return div;
 }
 
+/* Cronómetro guiado del HIIT 02: bloques de 1 min (ejercicios + descanso) */
+let hiitTimerId=null;
+function startHiitTimer(def){
+  if(hiitTimerId){ clearInterval(hiitTimerId); hiitTimerId=null; }
+  const bloques=[];
+  for(let r=1;r<=def.rondas;r++){ def.ejercicios.forEach(e=>bloques.push(`R${r} · ${e.lab}`)); bloques.push(`R${r} · Descanso`); }
+  let idx=0, end=Date.now()+60000;
+  const box=document.createElement('div'); box.className='hiit-timer';
+  box.innerHTML=`<div class="ht-lab"></div><div class="ht-time"></div><button class="ht-x">✕</button>`;
+  document.body.appendChild(box);
+  const pintar=()=>{ const left=Math.max(0,Math.round((end-Date.now())/1000));
+    box.querySelector('.ht-lab').textContent=bloques[idx];
+    box.querySelector('.ht-time').textContent=`0:${String(left).padStart(2,'0')}`;
+    box.classList.toggle('rest', bloques[idx].includes('Descanso'));
+    if(left<=0){ beep(); if(navigator.vibrate) navigator.vibrate(180);
+      idx++; if(idx>=bloques.length){ cerrar(); toast('¡HIIT completado! 20 min'); return; } end=Date.now()+60000; } };
+  const cerrar=()=>{ clearInterval(hiitTimerId); hiitTimerId=null; box.remove(); };
+  box.querySelector('.ht-x').onclick=cerrar;
+  pintar(); hiitTimerId=setInterval(pintar,250);
+}
+
+/* Resumen legible de un HIIT para el historial (tiempo o totales de reps) */
+function hiitResumen(w){
+  const l=S.hiit[w]||{}, def=HIIT[hiitOfWeek(w)];
+  if(def.modo==='reps' && l.reps){
+    return def.ejercicios.map(e=>{ let s=0; for(let r=0;r<def.rondas;r++) s+=(+(l.reps[e.id+r])||0); return `${e.lab} ${s}`; }).join(' · ');
+  }
+  return l.res||'';
+}
 /* ---- HISTORIAL (fuerza + HIIT, con editar y borrar) ---- */
 function renderHistorial(){
   const strength=Object.keys(S.logs).map(Number).filter(s=>S.logs[s].date)
       .map(s=>({type:'fuerza', s, date:S.logs[s].date}));
   const hiits=Object.keys(S.hiit).map(Number).filter(w=>S.hiit[w].done||S.hiit[w].date)
-      .map(w=>({type:'hiit', w, date:S.hiit[w].date||'', tag:S.hiit[w].tag||('HIIT 0'+hiitOfWeek(w)), res:S.hiit[w].res||''}));
+      .map(w=>({type:'hiit', w, date:S.hiit[w].date||'', tag:S.hiit[w].tag||('HIIT 0'+hiitOfWeek(w)), res:hiitResumen(w)}));
   const all=[...strength,...hiits].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   app.innerHTML=`<p class="eyebrow">Historial</p>
     <h2 class="h-big" style="font-size:24px">${strength.length} fuerza · ${hiits.length} HIIT</h2>
@@ -1186,7 +1349,7 @@ function renderStats(d){
   let html;
   if(benchmark){
     const faltan=Math.max(0,+(benchmark-currentW).toFixed(2));
-    const sesiones=faltan>0?Math.ceil(faltan/L.inc):0;
+    const sesiones=faltan>0?Math.ceil(faltan/currentInc(progLift)):0;
     html=`<div class="stat-line"><span class="bench-key">▦ Objetivo intermedio (carga de trabajo)</span><b>${benchmark} kg</b></div>
       <div class="stat-line">Equivale a (${BENCH[progLift]}× tu peso, a 1RM)<b>${bench1RM} kg</b></div>
       <div class="stat-line">Tu peso de trabajo actual<b>${currentW} kg</b></div>
