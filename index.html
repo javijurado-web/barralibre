@@ -123,6 +123,16 @@ nav button.active{color:var(--accent)}
 .dl-btns{display:flex;gap:8px;margin-top:14px}
 .dl-btns .btn{margin:0}
 .dl-btns .btn:disabled{opacity:.4}
+.chart-legend{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:8px}
+.lg-line{display:inline-block;width:16px;height:0;border-top:2px solid;vertical-align:middle;margin-left:8px}
+.lg-line.off{border-color:var(--accent)}
+.lg-line.fai{border-top:2px dashed var(--faint)}
+.edit-w{background:var(--surface-2);border:1px solid var(--line);color:var(--warm);width:26px;height:26px;border-radius:7px;font-size:13px;cursor:pointer;flex:none;padding:0}
+.edit-w:active{background:var(--accent);color:#160a02}
+.ew_prev{font-size:12.5px;color:var(--muted);margin:6px 0 0;min-height:16px}
+.alt-block{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+.alt-toggle{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--muted);cursor:pointer}
+.alt-toggle input{width:18px;height:18px;accent-color:var(--accent)}
 
 /* ---- Series ---- */
 .set-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--surface-2)}
@@ -612,7 +622,8 @@ function buildSession(s){
   const day = isA?'A':'B';
   const order = isA ? ['sentadilla','banca','peso_muerto'] : ['sentadilla','militar','clean'];
   const lifts = order.map(k=>{
-    const W=nearestLoadable(workWeight(k,s)); const L=LIFTS[k];
+    const ov = S.logs[s] && S.logs[s].override && S.logs[s].override[k];
+    const W = (ov!=null) ? ov : nearestLoadable(workWeight(k,s)); const L=LIFTS[k];
     const wu=warmups(W,L.wuType).map(x=>({...x, w:nearestLoadable(x.w), work:false}));
     const work=Array.from({length:L.work.sets},()=>({r:`1×${L.work.reps}`,w:W,work:true}));
     return {key:k, label:L.label, scheme:`${L.work.sets}×${L.work.reps}`, W, sets:[...wu,...work], page:L.page};
@@ -748,11 +759,12 @@ function renderHoy(){
       <p class="tiny center">Apunta tu resultado y el día en que lo hiciste.</p>`;
     document.getElementById('hiitday').appendChild(hiitCard());
     document.getElementById('hiitDone').onclick=()=>{
-      const cur=S.hiit[w]||{}; cur.done=true; cur.tag=def.tag;
+      const cur=S.hiit[w]||{}; cur.done=true;
+      cur.tag = cur.alt ? ('Actividad'+(cur.alt.tipo?' · '+cur.alt.tipo:'')) : def.tag;
       cur.date=cur.date||new Date().toISOString().slice(0,10);
       S.hiit[w]=cur; save();
       hoyMode='fuerza'; renderHoy(); window.scrollTo(0,0);
-      toast('HIIT guardado · a por la fuerza');
+      toast(cur.alt?'Actividad guardada · cuenta como HIIT':'HIIT guardado · a por la fuerza');
     };
   } else {
     // ----- DÍA DE FUERZA -----
@@ -889,6 +901,41 @@ function openDeloadDialog(liftKey){
     toast(`Descarga aplicada en ${L.label}: ${newW} kg, +${newInc}`);
   };
 }
+function openEditWeight(liftKey){
+  const L=LIFTS[liftKey];
+  const s=S.current;
+  const ovNow = S.logs[s] && S.logs[s].override && S.logs[s].override[liftKey];
+  const curW = ovNow!=null ? ovNow : nearestLoadable(workWeight(liftKey, s));
+  const ov=document.getElementById('editw-modal')||document.createElement('div');
+  ov.id='editw-modal'; ov.className='modal show';
+  ov.innerHTML=`<div class="modal-box">
+    <h3 class="dl-title" style="color:var(--accent)">Editar peso · ${L.label}</h3>
+    <p class="dl-intro">Peso de hoy: <b>${curW} kg</b>. Pon el que vas a hacer de verdad. Si te sientes fuerte y lo haces bien, ánclalo y seguirás progresando desde ahí.</p>
+    <div class="field"><label>Peso efectivo (kg)</label><input type="number" inputmode="decimal" id="ew_val" value="${curW}" step="0.5"></div>
+    <p class="ew_prev" id="ew_prev"></p>
+    <div class="dl-btns" style="flex-direction:column">
+      <button class="btn" id="ew_fwd">Anclar · de aquí en adelante</button>
+      <button class="btn ghost" id="ew_today">Solo por hoy</button>
+      <button class="btn ghost" id="ew_cancel">Cancelar</button>
+    </div>
+    <p class="tiny" style="margin-top:8px">"De aquí en adelante" mueve tu punto de partida a este peso y sigue subiendo desde él (ideal si tu 5RM iba corto). "Solo por hoy" no cambia las próximas sesiones. No afecta a marcar limpio/forzado/fallo.</p>
+  </div>`;
+  if(!ov.parentElement) document.body.appendChild(ov);
+  const val=()=>{ const v=parseFloat(document.getElementById('ew_val').value); return v>0?nearestLoadable(v):null; };
+  const prev=document.getElementById('ew_prev');
+  const refresh=()=>{ const v=val(); prev.textContent = v? (isLoadable(v)?`Cargable: ${v} kg`:`Se ajusta a ${v} kg (cargable con tus discos)`) : ''; };
+  document.getElementById('ew_val').addEventListener('input',refresh); refresh();
+  const close=()=>ov.classList.remove('show');
+  document.getElementById('ew_cancel').onclick=close;
+  document.getElementById('ew_today').onclick=()=>{ const v=val(); if(!v) return;
+    const lg=logFor(s); lg.override=lg.override||{}; lg.override[liftKey]=v; save(); close(); render(); toast(`Solo hoy: ${L.label} a ${v} kg`); };
+  document.getElementById('ew_fwd').onclick=()=>{ const v=val(); if(!v) return;
+    // quita override puntual de hoy si lo hubiera, y coloca un ancla en la sesión actual
+    if(S.logs[s]&&S.logs[s].override) delete S.logs[s].override[liftKey];
+    S.cfg.deloads=S.cfg.deloads||{}; S.cfg.deloads[liftKey]=(S.cfg.deloads[liftKey]||[]).filter(a=>a.session!==s);
+    S.cfg.deloads[liftKey].push({session:s, weight:v, inc:currentInc(liftKey)});
+    save(); close(); render(); toast(`Anclado: ${L.label} desde ${v} kg`); };
+}
 function liftCard(L,lg){
   const div=document.createElement('div'); div.className='card';
   const allDone=L.sets.every((_,i)=>lg.sets[setKey(L.key,i)]);
@@ -900,6 +947,7 @@ function liftCard(L,lg){
       <div class="left"><span class="ex-name">${L.label}</span></div>
       <div style="display:flex;align-items:center;gap:10px">
         <span class="ex-scheme">${L.scheme} · ${L.W} kg</span>
+        <button class="edit-w" onclick="event.stopPropagation();openEditWeight('${L.key}')" title="Editar peso">✎</button>
         ${outcomeBadge(r,allDone)}
         <span class="chev">▶</span>
       </div>
@@ -1085,7 +1133,19 @@ function hiitCard(){
       <ul style="margin:6px 0 8px;padding-left:18px;color:var(--text);font-size:14px;line-height:1.7">
         ${def.items.map(x=>`<li>${x}</li>`).join('')}</ul>
       <div class="note" style="font-size:12.5px;margin:6px 0">${def.nota}</div>
-      ${registro}
+      <div id="hiitReg" class="${log.alt?'hidden':''}">${registro}</div>
+      <div class="alt-block">
+        <label class="alt-toggle"><input type="checkbox" id="altTog" ${log.alt?'checked':''}> Sustituir por otra actividad (ruta, bici, nadar…)</label>
+        <div id="altFields" class="${log.alt?'':'hidden'}">
+          <div class="field" style="margin-top:8px"><label>Actividad</label><input id="alt_tipo" value="${(log.alt&&log.alt.tipo)||''}" placeholder="p. ej. Ruta al lago"></div>
+          <div class="calc-grid">
+            <div class="field"><label>Duración (min)</label><input id="alt_dur" type="number" inputmode="numeric" value="${(log.alt&&log.alt.dur)||''}" placeholder="—"></div>
+            <div class="field"><label>Distancia (km)</label><input id="alt_dist" type="number" inputmode="decimal" value="${(log.alt&&log.alt.dist)||''}" placeholder="—"></div>
+          </div>
+          <div class="field"><label>Notas (desnivel, intensidad…)</label><input id="alt_nota" value="${(log.alt&&log.alt.nota)||''}" placeholder="p. ej. +400 m, ritmo fuerte"></div>
+          <div class="note" style="font-size:12px">Cuenta como tu acondicionamiento de la semana en lugar del HIIT. Una ruta exigente de 1 h moviendo el cuerpo es cardio de sobra. 👍</div>
+        </div>
+      </div>
       <div class="acc-input" style="margin-top:8px"><span>Día realizado</span>
         <input id="hiitdate" type="date" value="${log.date||''}" style="width:auto"></div>
       <div class="help" style="margin-top:6px"><b>Idealmente el sábado</b>, en un día sin fuerza.
@@ -1107,6 +1167,22 @@ function hiitCard(){
     S.hiit[w]={...(S.hiit[w]||{}), date:e.target.value, tag:def.tag}; save(); });
   const tBtn=div.querySelector('#hiitTimer');
   if(tBtn) tBtn.onclick=()=>startHiitTimer(def);
+  // --- Actividad alternativa (sustituye al HIIT) ---
+  const saveAlt=()=>{ const cur=S.hiit[w]||{};
+    const tipo=div.querySelector('#alt_tipo').value.trim();
+    const dur=+div.querySelector('#alt_dur').value||0;
+    const dist=+div.querySelector('#alt_dist').value||0;
+    const nota=div.querySelector('#alt_nota').value.trim();
+    if(tipo||dur||dist||nota){ cur.alt={tipo,dur,dist,nota}; } else { cur.alt={}; }
+    cur.tag='Actividad'; S.hiit[w]=cur; save();
+  };
+  const altTog=div.querySelector('#altTog'), altFields=div.querySelector('#altFields'), hiitReg=div.querySelector('#hiitReg');
+  altTog.onchange=()=>{
+    if(altTog.checked){ altFields.classList.remove('hidden'); hiitReg.classList.add('hidden'); saveAlt(); }
+    else { altFields.classList.add('hidden'); hiitReg.classList.remove('hidden');
+      const cur=S.hiit[w]||{}; delete cur.alt; if(cur.tag==='Actividad') cur.tag=def.tag; S.hiit[w]=cur; save(); }
+  };
+  div.querySelectorAll('#alt_tipo,#alt_dur,#alt_dist,#alt_nota').forEach(i=>i.addEventListener('change',saveAlt));
   return div;
 }
 
@@ -1134,6 +1210,10 @@ function startHiitTimer(def){
 /* Resumen legible de un HIIT para el historial (tiempo o totales de reps) */
 function hiitResumen(w){
   const l=S.hiit[w]||{}, def=HIIT[hiitOfWeek(w)];
+  if(l.alt && (l.alt.tipo||l.alt.dur||l.alt.dist)){
+    const p=[]; if(l.alt.tipo)p.push(l.alt.tipo); if(l.alt.dur)p.push(l.alt.dur+' min'); if(l.alt.dist)p.push(l.alt.dist+' km');
+    return p.join(' · ');
+  }
   if(def.modo==='reps' && l.reps){
     return def.ejercicios.map(e=>{ let s=0; for(let r=0;r<def.rondas;r++) s+=(+(l.reps[e.id+r])||0); return `${e.lab} ${s}`; }).join(' · ');
   }
@@ -1768,6 +1848,7 @@ function bodyComposicion(c){
   c.innerHTML=`
     <div class="progress-pick" id="mpick">${metrics.map(([k,l])=>`<button data-m="${k}" class="${bodyMetric===k?'sel':''}">${l}</button>`).join('')}</div>
     <div class="chart-wrap"><svg class="chart" id="bchart" viewBox="0 0 344 236"></svg><div class="chart-tip" id="bTip"></div></div>
+    ${bodyMetric==='grasa'?`<div class="chart-legend"><span class="lg-line off"></span> Plicometría (oficial) <span class="lg-line fai"></span> Impedancia (referencia)</div>`:''}
     <label class="arch-toggle"><input type="checkbox" id="archTog" ${showArchive?'checked':''}> Ver histórico completo (verano 2025)</label>
     <div id="bstats" style="margin-top:12px"></div>`;
   document.querySelectorAll('#mpick button').forEach(b=>b.onclick=()=>{ bodyMetric=b.dataset.m; bodyComposicion(c); });
@@ -1781,9 +1862,15 @@ function metricSeries(includeArchive){
   if(bodyMetric==='peso') return {pts:rows.filter(r=>r.peso!=null).map(r=>({x:r.date,y:r.peso})), unit:'kg', ma:true};
   if(bodyMetric==='musculo') return {pts:rows.filter(r=>r.musculoImp!=null).map(r=>({x:r.date,y:r.musculoImp})), unit:'%', ma:true};
   if(bodyMetric==='grasa'){
-    const imp=rows.filter(r=>r.grasaImp!=null).map(r=>({x:r.date,y:r.grasaImp}));
     const cal=Object.keys(B.calipers).filter(f=>includeArchive||f>=B.config.epoch).sort().map(f=>({x:f,y:B.calipers[f].grasaJP3}));
-    return {pts:imp, unit:'%', ma:true, points2:cal, hline:B.config.tramoObjetivo, hlabel:`Objetivo ${B.config.tramoObjetivo}%`};
+    const imp=rows.filter(r=>r.grasaImp!=null).map(r=>({x:r.date,y:r.grasaImp}));
+    if(cal.length){
+      // plicometría = línea OFICIAL (naranja); impedancia = referencia tenue (media móvil)
+      return {pts:cal, unit:'%', ma:false, faint:(imp.length>=3?movingAvg(imp):imp),
+              hline:B.config.tramoObjetivo, hlabel:`Objetivo ${B.config.tramoObjetivo}%`, official:'plicómetro'};
+    }
+    // aún sin plicometría: la impedancia va de relleno (media móvil), avisando de que no es la oficial
+    return {pts:imp, unit:'%', ma:true, hline:B.config.tramoObjetivo, hlabel:`Objetivo ${B.config.tramoObjetivo}%`, impOnly:true};
   }
   if(bodyMetric==='kgGrasa'){
     const pts=rows.filter(r=>r.peso!=null).map(r=>{ const f=fatOficial(r.date); return f?{x:r.date,y:+(r.peso*f.val/100).toFixed(2)}:null; }).filter(Boolean);
@@ -1944,11 +2031,12 @@ function drawBodyChart(cardio){
   const allX=[...pts.map(p=>p.x)];
   const ma = (ser.ma && pts.length>=3) ? movingAvg(pts) : null;
   const p2 = ser.points2||null;
-  const extra=[]; if(ma) extra.push(...ma.map(p=>p.y)); if(p2) extra.push(...p2.map(p=>p.y));
+  const faint = ser.faint||null;
+  const extra=[]; if(ma) extra.push(...ma.map(p=>p.y)); if(p2) extra.push(...p2.map(p=>p.y)); if(faint) extra.push(...faint.map(p=>p.y));
   const envMin=ser.envMin||null, envMax=ser.envMax||null;
   if(envMin) extra.push(...envMin.map(p=>p.y)); if(envMax) extra.push(...envMax.map(p=>p.y));
   if(ser.hline!=null) extra.push(ser.hline);
-  const xs = [...pts, ...(p2||[]), ...(envMin||[]), ...(envMax||[])].map(p=>p.x);
+  const xs = [...pts, ...(p2||[]), ...(faint||[]), ...(envMin||[]), ...(envMax||[])].map(p=>p.x);
   const x0=xs.reduce((a,b)=>a<b?a:b), x1=xs.reduce((a,b)=>a>b?a:b);
   const span=Math.max(1, daysDiff(x0,x1));
   const ys=[...pts.map(p=>p.y), ...extra];
@@ -1969,6 +2057,7 @@ function drawBodyChart(cardio){
      <path d="${path(envMin)}" fill="none" stroke="#e0b020" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.8"/>`; }
   if(ser.hline!=null){ const hy=Y(ser.hline).toFixed(1); extraSvg+=`<line x1="${pX0}" y1="${hy}" x2="${pX1}" y2="${hy}" stroke="#3fae6a" stroke-width="1.5" stroke-dasharray="5 3"/>
      <rect x="${pX1-92}" y="${(+hy-15).toFixed(1)}" width="90" height="13" rx="3" fill="#3fae6a"/><text x="${pX1-47}" y="${(+hy-5).toFixed(1)}" fill="#0c140f" font-size="8.5" font-weight="700" text-anchor="middle" font-family="Inter,sans-serif">${ser.hlabel}</text>`; }
+  if(faint && faint.length) extraSvg+=`<path d="${path(faint)}" fill="none" stroke="var(--faint)" stroke-width="1.1" stroke-dasharray="3 3" opacity="0.6" stroke-linejoin="round"/>`;
   if(ma) extraSvg+=`<path d="${path(ma)}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="round"/>`;
   const mainStroke = ma? 'var(--faint)':'var(--accent)', mainW = ma?'1':'2.4';
   const dots = pts.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="${ma?1.6:2.6}" fill="${ma?'var(--faint)':'var(--warm)'}"/>`).join('');
