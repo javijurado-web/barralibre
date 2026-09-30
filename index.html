@@ -127,6 +127,10 @@ nav button.active{color:var(--accent)}
 .lg-line{display:inline-block;width:16px;height:0;border-top:2px solid;vertical-align:middle;margin-left:8px}
 .lg-line.off{border-color:var(--accent)}
 .lg-line.fai{border-top:2px dashed var(--faint)}
+.lg-line.cin{border-color:#4aa3d6}
+.peso-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.peso-head span{font-family:'Barlow Condensed';font-weight:700;font-size:13px;text-transform:uppercase;color:var(--muted)}
+.peso-head b{font-family:'Barlow Condensed';font-weight:800;font-size:24px;color:var(--accent)}
 .edit-w{background:var(--surface-2);border:1px solid var(--line);color:var(--warm);width:26px;height:26px;border-radius:7px;font-size:13px;cursor:pointer;flex:none;padding:0}
 .edit-w:active{background:var(--accent);color:#160a02}
 .ew_prev{font-size:12.5px;color:var(--muted);margin:6px 0 0;min-height:16px}
@@ -823,10 +827,12 @@ function prevLine(L){
   const ps=prevAppearance(L.key, S.current);
   if(!ps) return `<div class="prevline">Primera vez con este ejercicio · peso de partida <b>${L.W} kg</b></div>`;
   const pw=nearestLoadable(workWeight(L.key,ps));
-  const por=(S.logs[ps].out&&S.logs[ps].out[L.key]&&S.logs[ps].out[L.key].r)||'limpio';
+  const o=(S.logs[ps].out&&S.logs[ps].out[L.key])||{};
+  const por=o.r||'limpio';
+  const esf=o.esfuerzo?` · esfuerzo <b>${o.esfuerzo}/5</b>`:'';
   const delta=+(L.W-pw).toFixed(2);
   const chip = delta>0?`<span class="dlt up">▲ +${delta} kg</span>` : (delta<0?`<span class="dlt dn">▼ ${delta} kg</span>`:`<span class="dlt eq">= repites</span>`);
-  return `<div class="prevline">Última vez (S${ps}): ${pw} kg · <b>${por}</b> → hoy <b>${L.W} kg</b> ${chip}</div>`;
+  return `<div class="prevline">Última vez (S${ps}): ${pw} kg · <b>${por}</b>${esf} → hoy <b>${L.W} kg</b> ${chip}</div>`;
 }
 /* Calentamiento general del programa (antes de la sesión). Reescrito del libro. */
 const CAL_GEN={
@@ -1810,7 +1816,11 @@ function bodyRegistro(c){
   const sh=d.suenoMin!=null?Math.floor(d.suenoMin/60):'', sm=d.suenoMin!=null?d.suenoMin%60:'';
   const F=(k,lab,ph,unit)=>`<div class="field"><label>${lab}${unit?' ('+unit+')':''}</label>
      <input type="number" inputmode="decimal" data-d="${k}" value="${d[k]??''}" placeholder="${ph||'—'}"></div>`;
+  const p7=pesoCorporal7d();
+  const pesoPts=dailyRange(false).filter(r=>r.peso!=null);
   c.innerHTML=`
+    ${pesoPts.length? `<div class="peso-head"><span>Peso · media 7 días</span><b>${p7??'—'} kg</b></div>
+      <div class="chart-wrap" style="margin-bottom:4px"><svg class="chart" id="pesochart" viewBox="0 0 344 236" style="height:150px"></svg><div class="chart-tip" id="pesotip"></div></div>`:''}
     <div class="field"><label>Día</label><input type="date" id="bd" value="${bodyDate}" max="${new Date().toISOString().slice(0,10)}"></div>
     <p class="eyebrow" style="margin-top:14px">Báscula</p>
     <div class="calc-grid">
@@ -1831,6 +1841,7 @@ function bodyRegistro(c){
     </div>
     <button class="btn" id="saveDay" style="margin-top:14px">Guardar el día</button>
     <p class="tiny center" style="margin-top:8px">El peso alimenta tu objetivo de fuerza (media de 7 días). La carga en barra no cambia por tu peso.</p>`;
+  if(pesoPts.length) drawBodyChart(false,'peso','pesochart','pesotip');
   document.getElementById('bd').addEventListener('change',e=>{ bodyDate=e.target.value; bodyRegistro(c); });
   document.getElementById('saveDay').onclick=()=>{
     const obj={...(B.daily[bodyDate]||{})};
@@ -1844,40 +1855,54 @@ function bodyRegistro(c){
 
 /* ---- COMPOSICIÓN (triangulación) ---- */
 function bodyComposicion(c){
-  const metrics=[['peso','Peso'],['grasa','% grasa'],['kgGrasa','kg grasa'],['musculo','% músculo'],['kgMusculo','kg músculo'],['cintura','Cintura']];
+  if(!['grasa','musculo'].includes(bodyMetric)) bodyMetric='grasa';
+  const metrics=[['grasa','Grasa'],['musculo','Músculo']];
+  const esGrasa = bodyMetric==='grasa';
   c.innerHTML=`
     <div class="progress-pick" id="mpick">${metrics.map(([k,l])=>`<button data-m="${k}" class="${bodyMetric===k?'sel':''}">${l}</button>`).join('')}</div>
     <div class="chart-wrap"><svg class="chart" id="bchart" viewBox="0 0 344 236"></svg><div class="chart-tip" id="bTip"></div></div>
-    ${bodyMetric==='grasa'?`<div class="chart-legend"><span class="lg-line off"></span> Plicometría (oficial) <span class="lg-line fai"></span> Impedancia (referencia)</div>`:''}
+    ${esGrasa?`<div class="chart-legend"><span class="lg-line off"></span> Plicometría (oficial) <span class="lg-line fai"></span> Impedancia${showCintura?' <span class="lg-line cin"></span> Cintura (cm, dcha.)':''}</div>
+      <label class="arch-toggle" style="margin-top:8px"><input type="checkbox" id="cinTog" ${showCintura?'checked':''}> Superponer cintura</label>`:
+      `<div class="note" style="margin-top:8px;font-size:12.5px">La báscula mide el músculo con poca fiabilidad. Tus señales de verdad de que conservas músculo son la <b>fuerza (pestaña Progreso)</b> y los <b>perímetros</b> (bíceps, muslo, pecho) subiendo.</div>`}
     <label class="arch-toggle"><input type="checkbox" id="archTog" ${showArchive?'checked':''}> Ver histórico completo (verano 2025)</label>
-    <div id="bstats" style="margin-top:12px"></div>`;
+    <div id="bstats" style="margin-top:12px"></div>
+    ${esGrasa?`<div class="obj-block">
+      <p class="eyebrow" style="margin-top:18px">Objetivo</p>
+      <div class="field"><label>Tramo de grasa objetivo (%)</label><input type="number" inputmode="decimal" id="tramo" value="${B.config.tramoObjetivo}"></div>
+      <div class="stat-line">Sobre sano de pérdida<b>${B.config.ritmoMin}–${B.config.ritmoMax} kg grasa/sem</b></div>
+      <div class="stat-line">Punto cero<b>${formatEs(B.config.epoch)}</b></div>
+      <button class="btn ghost" id="saveObj" style="margin-top:8px">Guardar objetivo</button>
+      <button class="btn ghost" id="resetEpoch" style="margin-top:8px">Reanclar punto cero a hoy</button>
+    </div>`:''}`;
   document.querySelectorAll('#mpick button').forEach(b=>b.onclick=()=>{ bodyMetric=b.dataset.m; bodyComposicion(c); });
   document.getElementById('archTog').onchange=e=>{ showArchive=e.target.checked; bodyComposicion(c); };
+  const ct=document.getElementById('cinTog'); if(ct) ct.onchange=e=>{ showCintura=e.target.checked; bodyComposicion(c); };
+  const so=document.getElementById('saveObj'); if(so) so.onclick=()=>{ const t=+document.getElementById('tramo').value; if(t>0){B.config.tramoObjetivo=t; saveBody(); toast('Objetivo actualizado'); bodyComposicion(c);} };
+  const re=document.getElementById('resetEpoch'); if(re) re.onclick=()=>{ askConfirm('¿Poner el punto cero en hoy? Las gráficas del día a día arrancarán desde hoy (el histórico sigue con el toggle).', ()=>{ B.config.epoch=new Date().toISOString().slice(0,10); saveBody(); toast('Punto cero reanclado'); bodyComposicion(c); }, 'Reanclar'); };
   drawBodyChart(); bodyCompStats();
 }
 
-// Serie según métrica seleccionada
-function metricSeries(includeArchive){
+let showCintura=false; // superponer cintura en la vista de grasa
+// Serie según la métrica dada (por defecto, la seleccionada)
+function metricSeries(includeArchive, metric){
+  metric = metric || bodyMetric;
   const rows=dailyRange(includeArchive);
-  if(bodyMetric==='peso') return {pts:rows.filter(r=>r.peso!=null).map(r=>({x:r.date,y:r.peso})), unit:'kg', ma:true};
-  if(bodyMetric==='musculo') return {pts:rows.filter(r=>r.musculoImp!=null).map(r=>({x:r.date,y:r.musculoImp})), unit:'%', ma:true};
-  if(bodyMetric==='grasa'){
+  if(metric==='peso') return {pts:rows.filter(r=>r.peso!=null).map(r=>({x:r.date,y:r.peso})), unit:'kg', ma:true};
+  // MÚSCULO en kg absolutos (lo que quieres conservar en definición)
+  if(metric==='musculo') return {pts:rows.filter(r=>r.peso!=null&&r.musculoImp!=null).map(r=>({x:r.date,y:+(r.peso*r.musculoImp/100).toFixed(2)})), unit:'kg', ma:true};
+  if(metric==='grasa'){
     const cal=Object.keys(B.calipers).filter(f=>includeArchive||f>=B.config.epoch).sort().map(f=>({x:f,y:B.calipers[f].grasaJP3}));
     const imp=rows.filter(r=>r.grasaImp!=null).map(r=>({x:r.date,y:r.grasaImp}));
+    // cintura como serie secundaria (eje derecho, cm) si el toggle está activo
+    const cin = showCintura ? Object.keys(B.perimeters).filter(f=>(includeArchive||f>=B.config.epoch)&&B.perimeters[f].cintura!=null).sort().map(f=>({x:f,y:B.perimeters[f].cintura})) : null;
+    const secondary = (cin&&cin.length)?{pts:cin, unit:'cm', label:'Cintura', color:'#4aa3d6'}:null;
     if(cal.length){
-      // plicometría = línea OFICIAL (naranja); impedancia = referencia tenue (media móvil)
       return {pts:cal, unit:'%', ma:false, faint:(imp.length>=3?movingAvg(imp):imp),
-              hline:B.config.tramoObjetivo, hlabel:`Objetivo ${B.config.tramoObjetivo}%`, official:'plicómetro'};
+              hline:B.config.tramoObjetivo, hlabel:`Objetivo ${B.config.tramoObjetivo}%`, official:'plicómetro', secondary};
     }
-    // aún sin plicometría: la impedancia va de relleno (media móvil), avisando de que no es la oficial
-    return {pts:imp, unit:'%', ma:true, hline:B.config.tramoObjetivo, hlabel:`Objetivo ${B.config.tramoObjetivo}%`, impOnly:true};
+    return {pts:imp, unit:'%', ma:true, hline:B.config.tramoObjetivo, hlabel:`Objetivo ${B.config.tramoObjetivo}%`, impOnly:true, secondary};
   }
-  if(bodyMetric==='kgGrasa'){
-    const pts=rows.filter(r=>r.peso!=null).map(r=>{ const f=fatOficial(r.date); return f?{x:r.date,y:+(r.peso*f.val/100).toFixed(2)}:null; }).filter(Boolean);
-    const env=fatEnvelope(); return {pts, unit:'kg', envMin:env.min, envMax:env.max};
-  }
-  if(bodyMetric==='kgMusculo') return {pts:rows.filter(r=>r.peso!=null&&r.musculoImp!=null).map(r=>({x:r.date,y:+(r.peso*r.musculoImp/100).toFixed(2)})), unit:'kg', ma:true};
-  if(bodyMetric==='cintura'){
+  if(metric==='cintura'){
     const per=Object.keys(B.perimeters).filter(f=>(includeArchive||f>=B.config.epoch)&&B.perimeters[f].cintura!=null).sort();
     return {pts:per.map(f=>({x:f,y:B.perimeters[f].cintura})), unit:'cm'};
   }
@@ -1909,10 +1934,23 @@ function bodyCompStats(){
   if(rows.length<1){ el.innerHTML=`<div class="note">Aún no hay registros desde tu punto cero (${formatEs(ep)}). Registra tu primer día en la pestaña <b>Registro</b>; idealmente con una plicometría en <b>Medidas</b>.</div>`; return; }
   const last=rows[rows.length-1], fo=fatOficial(last.date);
   const p7=pesoCorporal7d();
+  // --- Vista MÚSCULO: kg principal, % de apoyo ---
+  if(bodyMetric==='musculo'){
+    let h=`<div class="stat-line">Peso (media 7 días)<b>${p7??'—'} kg</b></div>`;
+    if(last.musculoImp!=null){ const kgM=+(last.peso*last.musculoImp/100).toFixed(1);
+      h+=`<div class="stat-line">kg de músculo<b>${kgM} kg</b></div>
+          <div class="stat-line">% músculo (impedancia)<b>${last.musculoImp}%</b></div>`;
+      const serie=rows.filter(r=>r.musculoImp!=null).map(r=>({d:daysDiff(ep,r.date), y:r.peso*r.musculoImp/100}));
+      if(serie.length>=2){ const rM=slope(serie)*7; h+=`<div class="stat-line">Tendencia<b>${rM>=0?'+':'−'}${Math.abs(rM).toFixed(2)} kg/sem</b></div>`; }
+    } else h+=`<div class="note" style="margin-top:8px">Aún sin dato de músculo. Regístralo en <b>Registro</b> (báscula).</div>`;
+    h+=`<div class="note" style="margin-top:8px">Recuerda: el músculo de la báscula es orientativo. Que la <b>fuerza suba</b> y los <b>perímetros crezcan</b> es la prueba real de que lo conservas.</div>`;
+    el.innerHTML=h; return;
+  }
+  // --- Vista GRASA: % principal, kg de apoyo ---
   let html=`<div class="stat-line">Peso (media 7 días)<b>${p7??'—'} kg</b></div>`;
   if(fo){ const kgF=+(last.peso*fo.val/100).toFixed(1);
     html+=`<div class="stat-line">% grasa oficial (${fo.src})<b>${fo.val}%</b></div>
-      <div class="stat-line">kg de grasa<b>${kgF} kg</b></div>`;
+      <div class="stat-line">kg de grasa (apoyo)<b>${kgF} kg</b></div>`;
     // ritmo real desde epoch (regresión simple sobre kg grasa)
     const series=rows.map(r=>{ const f=fatOficial(r.date); return f?{d:daysDiff(ep,r.date), y:r.peso*f.val/100}:null; }).filter(Boolean);
     if(series.length>=2){
@@ -1931,7 +1969,7 @@ function bodyCompStats(){
         const fin=new Date(last.date); fin.setDate(fin.getDate()+Math.round(semanas*7));
         html+=`<div class="stat-line">Llegas a ${B.config.tramoObjetivo}% (est.)<b>${formatEs(fin.toISOString().slice(0,10))}</b></div>`;
       } else if(kgF<=tramoKg){
-        html+=`<div class="note" style="margin-top:8px">🎯 Has alcanzado tu tramo de <b>${B.config.tramoObjetivo}%</b>. Toca cambiar de objetivo: subir fuerza a mantenimiento, y luego apuntar a ${B.config.objFinalMin}–${B.config.objFinalMax}%. Cámbialo en <b>Medidas</b>.</div>`;
+        html+=`<div class="note" style="margin-top:8px">🎯 Has alcanzado tu tramo de <b>${B.config.tramoObjetivo}%</b>. Toca cambiar de objetivo: subir fuerza a mantenimiento, y luego apuntar a ${B.config.objFinalMin}–${B.config.objFinalMax}%. Cámbialo aquí abajo.</div>`;
       }
     }
   } else {
@@ -1994,16 +2032,7 @@ function bodyMedidas(c){
       ${PF('cintura','Cintura (ombligo)')}${PF('muslo','Muslo')}${PF('rodilla','Rodilla')}${PF('pantorrilla','Pantorrilla')}
     </div>
     <button class="btn" id="savePer" style="margin-top:10px">Guardar perímetros</button>
-    <div class="note" style="margin-top:12px">Los ratios áureos (hombros ≈ 1,61× cintura, etc.) se evalúan <b>en seco al final de definición</b>, no en volumen: la grasa infla la cintura y engaña. Usa la cintura para seguimiento; el set completo, para la foto final.</div>
-
-    <p class="eyebrow" style="margin-top:22px">Objetivo actual</p>
-    <div class="card"><div class="card-body" style="display:block;border:none">
-      <div class="field"><label>Tramo de grasa objetivo (%)</label><input type="number" inputmode="decimal" id="tramo" value="${B.config.tramoObjetivo}"></div>
-      <div class="stat-line">Sobre sano de pérdida<b>${B.config.ritmoMin}–${B.config.ritmoMax} kg grasa/sem</b></div>
-      <div class="stat-line">Punto cero (epoch)<b>${formatEs(B.config.epoch)}</b></div>
-      <button class="btn ghost" id="saveObj" style="margin-top:10px">Guardar objetivo</button>
-      <button class="btn ghost" id="resetEpoch" style="margin-top:8px">Reanclar punto cero a hoy</button>
-    </div></div>`;
+    <div class="note" style="margin-top:12px">Los ratios áureos (hombros ≈ 1,61× cintura, etc.) se evalúan <b>en seco al final de definición</b>, no en volumen: la grasa infla la cintura y engaña. Usa la cintura para seguimiento; el set completo, para la foto final.</div>`;
   // plicometría: cálculo en vivo
   const recompCal=()=>{ const p=+document.getElementById('cp').value, a=+document.getElementById('ca').value, m=+document.getElementById('cm').value;
     if(p>0&&a>0&&m>0) document.getElementById('cjp').value=jp3(p,a,m,B.config.edad)+'%'; };
@@ -2015,17 +2044,16 @@ function bodyMedidas(c){
   document.getElementById('savePer').onclick=()=>{ const f=document.getElementById('perDate').value; const obj={...(B.perimeters[f]||{})};
     c.querySelectorAll('[data-p]').forEach(i=>{ const k=i.dataset.p,v=i.value.trim(); if(v==='') delete obj[k]; else obj[k]=+v; });
     if(Object.keys(obj).length) B.perimeters[f]=obj; else delete B.perimeters[f]; saveBody(); toast('Perímetros guardados'); };
-  document.getElementById('saveObj').onclick=()=>{ const t=+document.getElementById('tramo').value; if(t>0){B.config.tramoObjetivo=t; saveBody(); toast('Objetivo actualizado');} };
-  document.getElementById('resetEpoch').onclick=()=>{ askConfirm('¿Poner el punto cero en hoy? Las gráficas del día a día arrancarán desde hoy (el histórico sigue accesible con el toggle).', ()=>{ B.config.epoch=new Date().toISOString().slice(0,10); saveBody(); toast('Punto cero reanclado'); renderCuerpo(); }, 'Reanclar'); };
 }
 
 /* ---- GRÁFICA de cuerpo (ejes temporales + tooltip + sobre/objetivo) ---- */
-function drawBodyChart(cardio){
-  const svg=document.getElementById('bchart'); if(!svg) return;
-  const ser=metricSeries(showArchive);
+function drawBodyChart(cardio, metricOverride, svgId, tipId){
+  const svg=document.getElementById(svgId||'bchart'); if(!svg) return;
+  const crossId=(svgId||'b')+'cross';
+  const ser=metricSeries(showArchive, metricOverride);
   let pts=ser.pts.slice();
   if(cardio){ const rows=dailyRange(showArchive).filter(r=>r[bodyMetric]!=null); pts=rows.map(r=>({x:r.date,y:r[bodyMetric]})); }
-  const tip=document.getElementById('bTip');
+  const tip=document.getElementById(tipId||'bTip');
   if(!pts.length){ svg.innerHTML=`<text x="172" y="118" fill="var(--faint)" font-size="11" text-anchor="middle" font-family="Inter,sans-serif">Sin datos aún</text>`; return; }
   // dominio X temporal (días desde el primer punto mostrado)
   const allX=[...pts.map(p=>p.x)];
@@ -2041,9 +2069,14 @@ function drawBodyChart(cardio){
   const span=Math.max(1, daysDiff(x0,x1));
   const ys=[...pts.map(p=>p.y), ...extra];
   let yMin=Math.min(...ys), yMax=Math.max(...ys); const pad=(yMax-yMin)*0.08||1; yMin-=pad; yMax+=pad;
-  const VBW=344,VBH=236,mL=40,mR=14,mT=14,mB=24, pX0=mL,pX1=VBW-mR,pY0=mT,pY1=VBH-mB,pW=pX1-pX0,pH=pY1-pY0;
+  const sec = (ser.secondary && ser.secondary.pts.length) ? ser.secondary : null;
+  const VBW=344,VBH=236,mL=40,mR=sec?26:14,mT=14,mB=24, pX0=mL,pX1=VBW-mR,pY0=mT,pY1=VBH-mB,pW=pX1-pX0,pH=pY1-pY0;
   const X=iso=>pX0+pW*daysDiff(x0,iso)/span;
   const Y=v=>pY1-pH*(v-yMin)/((yMax-yMin)||1);
+  // eje secundario (cintura, cm) escalado a su propio min/max
+  let Y2=null, sMin, sMax;
+  if(sec){ const sys=sec.pts.map(p=>p.y); sMin=Math.min(...sys); sMax=Math.max(...sys); const sp=(sMax-sMin)*0.15||1; sMin-=sp; sMax+=sp;
+    Y2=v=>pY1-pH*(v-sMin)/((sMax-sMin)||1); }
   let grid='';
   for(let g=0;g<=4;g++){ const val=yMin+(yMax-yMin)*g/4, yy=Y(val).toFixed(1);
     grid+=`<line x1="${pX0}" y1="${yy}" x2="${pX1}" y2="${yy}" stroke="var(--line)" stroke-width="0.7"/><text x="${pX0-5}" y="${(+yy+3).toFixed(1)}" fill="var(--faint)" font-size="9" text-anchor="end" font-family="Inter,sans-serif">${(+val.toFixed(val>60?0:1))}</text>`; }
@@ -2058,18 +2091,23 @@ function drawBodyChart(cardio){
   if(ser.hline!=null){ const hy=Y(ser.hline).toFixed(1); extraSvg+=`<line x1="${pX0}" y1="${hy}" x2="${pX1}" y2="${hy}" stroke="#3fae6a" stroke-width="1.5" stroke-dasharray="5 3"/>
      <rect x="${pX1-92}" y="${(+hy-15).toFixed(1)}" width="90" height="13" rx="3" fill="#3fae6a"/><text x="${pX1-47}" y="${(+hy-5).toFixed(1)}" fill="#0c140f" font-size="8.5" font-weight="700" text-anchor="middle" font-family="Inter,sans-serif">${ser.hlabel}</text>`; }
   if(faint && faint.length) extraSvg+=`<path d="${path(faint)}" fill="none" stroke="var(--faint)" stroke-width="1.1" stroke-dasharray="3 3" opacity="0.6" stroke-linejoin="round"/>`;
+  if(sec){ const path2=arr=>arr.map((p,i)=>`${i?'L':'M'}${X(p.x).toFixed(1)},${Y2(p.y).toFixed(1)}`).join(' ');
+    extraSvg+=`<path d="${path2(sec.pts)}" fill="none" stroke="${sec.color}" stroke-width="2" stroke-linejoin="round"/>`;
+    extraSvg+=sec.pts.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y2(p.y).toFixed(1)}" r="2.4" fill="${sec.color}"/>`).join('');
+    extraSvg+=`<text x="${pX1+3}" y="${(Y2(sMax-(sMax-sMin)*0.15)+3).toFixed(1)}" fill="${sec.color}" font-size="8" text-anchor="start" font-family="Inter,sans-serif">${(sMax-(sMax-sMin)*0.15).toFixed(0)}</text>
+                <text x="${pX1+3}" y="${(Y2(sMin+(sMax-sMin)*0.15)+3).toFixed(1)}" fill="${sec.color}" font-size="8" text-anchor="start" font-family="Inter,sans-serif">${(sMin+(sMax-sMin)*0.15).toFixed(0)}</text>`; }
   if(ma) extraSvg+=`<path d="${path(ma)}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="round"/>`;
   const mainStroke = ma? 'var(--faint)':'var(--accent)', mainW = ma?'1':'2.4';
   const dots = pts.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="${ma?1.6:2.6}" fill="${ma?'var(--faint)':'var(--warm)'}"/>`).join('');
   const dots2 = p2? p2.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="3.6" fill="#3fae6a" stroke="#0c140f" stroke-width="0.5"><title>plicómetro ${p.y}%</title></circle>`).join('') : '';
   svg.innerHTML=`${grid}${extraSvg}<path d="${path(pts)}" fill="none" stroke="${mainStroke}" stroke-width="${mainW}" stroke-linejoin="round"/>${dots}${dots2}${xl}
-    <line id="bcross" x1="0" y1="${pY0}" x2="0" y2="${pY1}" stroke="var(--warm)" stroke-width="1" opacity="0"/>`;
+    <line id="${crossId}" x1="0" y1="${pY0}" x2="0" y2="${pY1}" stroke="var(--warm)" stroke-width="1" opacity="0"/>`;
   // tooltip
   const at=clientX=>{ const rect=svg.getBoundingClientRect(); const vx=(clientX-rect.left)/rect.width*VBW;
     let best=pts[0],bd=1e9; pts.forEach(p=>{ const dd=Math.abs(X(p.x)-vx); if(dd<bd){bd=dd;best=p;} });
-    const cr=document.getElementById('bcross'); cr.setAttribute('x1',X(best.x)); cr.setAttribute('x2',X(best.x)); cr.setAttribute('opacity','0.5');
-    tip.innerHTML=`${fmt(best.x)} · <b>${best.y} ${ser.unit||''}</b>`; tip.style.opacity='1'; tip.style.left=Math.min(80,Math.max(2,(X(best.x)/VBW)*100))+'%'; };
-  const hide=()=>{ const cr=document.getElementById('bcross'); if(cr)cr.setAttribute('opacity','0'); tip.style.opacity='0'; };
+    const cr=document.getElementById(crossId); if(cr){cr.setAttribute('x1',X(best.x)); cr.setAttribute('x2',X(best.x)); cr.setAttribute('opacity','0.5');}
+    if(tip){ tip.innerHTML=`${fmt(best.x)} · <b>${best.y} ${ser.unit||''}</b>`; tip.style.opacity='1'; tip.style.left=Math.min(80,Math.max(2,(X(best.x)/VBW)*100))+'%'; } };
+  const hide=()=>{ const cr=document.getElementById(crossId); if(cr)cr.setAttribute('opacity','0'); if(tip) tip.style.opacity='0'; };
   svg.onpointerdown=e=>{at(e.clientX);}; svg.onpointermove=e=>{ if(e.buttons||e.pointerType==='touch') at(e.clientX); };
   svg.onpointerup=hide; svg.onpointerleave=e=>{ if(!e.buttons) hide(); };
 }
