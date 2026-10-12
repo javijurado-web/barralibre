@@ -221,6 +221,37 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .ov-sub{margin-top:6px;font-size:12px;color:var(--muted)}
 .ov-sub b{color:var(--text)}
 .ov-warn{color:#e0594e;font-weight:600}
+/* Fase II */
+.f2sets{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.f2set{display:flex;flex-direction:column;align-items:center;gap:3px}
+.f2set-l{font-family:'Barlow Condensed';font-weight:700;font-size:11px;color:var(--muted)}
+.f2set input{width:52px;text-align:center;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:9px 2px;font-size:16px}
+.f2set input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.f2week{display:flex;flex-direction:column;gap:7px}
+.f2wd{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+.f2wd.rest{opacity:.5}
+.f2wd.now{border-color:var(--accent)}
+.f2wd-d{font-family:'Barlow Condensed';font-weight:800;font-size:15px;color:var(--warm);width:34px}
+.f2wd-n{flex:1;font-size:14px}
+.f2wd-tag{font-family:'Barlow Condensed';font-weight:700;font-size:11px;color:#160a02;background:var(--accent);padding:2px 8px;border-radius:99px}
+.hist-row{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.hist-d{font-family:'Barlow Condensed';font-weight:700;color:var(--muted);min-width:68px;font-size:13px}
+.f2wu{background:var(--surface-2);border-radius:9px;padding:8px 10px;margin:8px 0}
+.f2wu-t{font-family:'Barlow Condensed';font-weight:700;font-size:11px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px}
+.f2wu-s{display:flex;justify-content:space-between;font-size:13px;padding:2px 0;color:var(--muted)}
+.f2wu-s b{color:var(--text)}
+.f2sets-wrap{margin-top:10px}
+/* Selector de fase (arriba de Hoy) */
+.fase-switch{display:flex;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:5px;margin-bottom:8px}
+.fase-switch button{flex:1;font-family:'Barlow Condensed';font-weight:700;font-size:16px;text-transform:uppercase;color:var(--muted);background:none;border:none;border-radius:9px;padding:9px 0;cursor:pointer}
+.fase-switch button.sel{background:var(--accent);color:#160a02}
+.fase-note{font-size:11.5px;color:var(--faint);margin:0 0 14px;line-height:1.5}
+.fase-note b{color:var(--muted)}
+.prog-tabs{margin-top:10px}
+.c3{display:flex;gap:10px;align-items:flex-start;margin:8px 0;font-size:13px;color:var(--muted)}
+.c3-n{flex:none;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#160a02;font-family:'Barlow Condensed';font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px}
+.c3 b{color:var(--text)}
+.opt-badge{font-family:'Barlow Condensed';font-weight:700;font-size:10px;text-transform:uppercase;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:99px;padding:1px 7px;vertical-align:middle}
 /* HIIT: rejilla de repeticiones por ronda */
 .hiit-grid{display:grid;gap:6px;align-items:center}
 .hg-h{font-family:'Barlow Condensed';font-weight:700;font-size:12px;text-transform:uppercase;color:var(--muted);text-align:center}
@@ -481,6 +512,8 @@ let S = load();
 if(!S.hiit) S.hiit={};   // migración para guardados anteriores
 if(!S.cfg.nutri) S.cfg.nutri={};
 if(!S.cfg.deloads) S.cfg.deloads={};
+if(!S.fase) S.fase=1;                 // 1 = novatos (full-body) · 2 = torso-pierna
+if(!S.f2) S.f2={ started:null, cur:1, logs:{}, weights:{}, hiit:{} };
 // Actualiza el juego de discos SOLO si tenías el set anterior por defecto (no pisa uno personalizado)
 if(S.cfg.plates && S.cfg.plates.join(',')==='20,10,5,2.5,1.25,1,0.5'){ S.cfg.plates=[25,20,15,10,5,2.5,2,1.5,1,0.5]; save(); }
 if(lastCompletedSession()===0) S.current=1;  // sin historial -> empezar en Sesión 1 (día A)
@@ -691,12 +724,14 @@ const app=document.getElementById('app');
 const pill=document.getElementById('pill');
 
 function render(){
-  pill.textContent = S.onboarded ? `Sem ${weekOf(S.current)} · S${S.current}/${TOTAL_SESSIONS} · Día ${S.current%2?'A':'B'}` : 'Bienvenido';
+  pill.textContent = !S.onboarded ? 'Bienvenido'
+    : S.fase===2 ? `Fase II · Sem ${f2Week(S.f2.cur)} · Día ${f2DayIdx(S.f2.cur)+1}/5`
+    : `Fase I · Sem ${weekOf(S.current)} · S${S.current}/${TOTAL_SESSIONS} · Día ${S.current%2?'A':'B'}`;
   if(!S.onboarded){ renderOnboarding(); return; }
-  if(view==='hoy') renderHoy();
-  else if(view==='calendario') renderCalendario();
-  else if(view==='historial') renderHistorial();
-  else if(view==='progreso') renderProgreso();
+  if(view==='hoy') (S.fase===2?renderHoyF2:renderHoy)();
+  else if(view==='calendario') (S.fase===2?renderCalendarioF2:renderCalendario)();
+  else if(view==='historial') (S.fase===2?renderHistorialF2:renderHistorial)();
+  else if(view==='progreso'){ if(progView==null) progView=S.fase; (progView===2?renderProgresoF2:renderProgreso)(); }
   else if(view==='nutricion') renderNutricion();
   else if(view==='cuerpo') renderCuerpo();
   else renderAjustes();
@@ -739,6 +774,15 @@ function nextTraining(){
 }
 
 let hoyMode=null; // 'fuerza' | 'hiit' — qué entrenas hoy
+let progView=null; // qué fase se VISUALIZA en Progreso (independiente de la fase activa)
+function progTabsHTML(){
+  const f2started=!!(S.f2&&S.f2.started);
+  return `<div class="ntabs prog-tabs">
+    <button data-pv="1" class="${progView===1?'sel':''}">Fase I</button>
+    <button data-pv="2" class="${progView===2?'sel':''}" ${f2started?'':'disabled style=\"opacity:.45\"'}>Fase II${f2started?'':' · sin datos'}</button>
+  </div>`;
+}
+function wireProgTabs(){ document.querySelectorAll('.prog-tabs button').forEach(b=>{ if(b.disabled)return; b.onclick=()=>{ progView=+b.dataset.pv; render(); window.scrollTo(0,0); }; }); }
 function renderHoy(){
   const nt=nextTraining();
   if(hoyMode===null) hoyMode = (nt.type==='hiit') ? 'hiit' : 'fuerza';
@@ -820,6 +864,7 @@ function renderHoy(){
     };
   }
   // selector de día (común a ambos modos)
+  wireFaseSwitcher();
   document.querySelectorAll('.day-toggle .dt').forEach(b=>b.onclick=()=>{ hoyMode=b.dataset.mode; renderHoy(); window.scrollTo(0,0); });
 }
 
@@ -1038,21 +1083,34 @@ function applyOutcome(div, lk, r, curW){
 }
 
 // Última sesión registrada (antes de beforeS) con datos de este accesorio
-function prevAccessory(accId, beforeS){
-  for(let p=beforeS-1;p>=1;p--){
-    if(sessionLogged(p) && S.logs[p].acc && S.logs[p].acc[accId] && Object.keys(S.logs[p].acc[accId]).some(k=>S.logs[p].acc[accId][k]!==''&&S.logs[p].acc[accId][k]!=null))
-      return {s:p, v:S.logs[p].acc[accId]};
+// "m:ss" o segundos -> segundos (para comparar marcas de tiempo)
+function toSec(t){ if(t==null||t==='') return 0; const s=String(t).trim(); if(s.includes(':')){ const [m,sec]=s.split(':'); return (+m||0)*60+(+sec||0); } return +s||0; }
+// Puntuación de una marca: total de reps (amrap) o total de segundos (tiempo)
+function accScore(a, v){
+  if(a.kind==='amrap') return (+v.s0||0)+(+v.s1||0)+(+v.s2||0);
+  if(a.kind==='time4') return toSec(v.t1)+toSec(v.t2)+toSec(v.t3)+toSec(v.t4);
+  if(a.kind==='time')  return toSec(v.t1)+toSec(v.t2);
+  return 0;
+}
+// MEJOR marca previa (la que hay que batir), no la última: un mal día no baja el listón
+function bestAccessory(accId, a, beforeS){
+  let best=null, bestScore=-1;
+  for(let p=1;p<beforeS;p++){
+    const v=S.logs[p] && S.logs[p].acc && S.logs[p].acc[accId];
+    if(!v || !Object.keys(v).some(k=>v[k]!==''&&v[k]!=null)) continue;
+    const sc=accScore(a,v);
+    if(sc>bestScore){ bestScore=sc; best={s:p, v}; }
   }
-  return null;
+  return best;
 }
 function accPrevLine(a){
-  const p=prevAccessory(a.id, S.current); if(!p) return '';
+  const p=bestAccessory(a.id, a, S.current); if(!p) return '';
   const v=p.v; let txt='';
   if(a.kind==='amrap'){ const reps=[v.s0,v.s1,v.s2].filter(x=>x!=null&&x!=='').join(' · '); txt=`${reps||'—'} reps · lastre ${v.lastre??0} kg`; }
   else if(a.kind==='time4'){ txt=['t1','t2','t3','t4'].map(k=>v[k]||'—').join(' / '); }
   else if(a.kind==='time'){ txt=`${v.t1||'—'} · ${v.t2||'—'}`; }
   else return '';
-  return `<div class="prevline">Última vez (S${p.s}): <b>${txt}</b> · supérate un poquito 💪</div>`;
+  return `<div class="prevline">🎯 A batir · mejor marca (S${p.s}): <b>${txt}</b></div>`;
 }
 function accCard(a,lg){
   const div=document.createElement('div'); div.className='card open';
@@ -1344,6 +1402,7 @@ function overviewHTML(){
 function renderProgreso(){
   app.innerHTML=`<p class="eyebrow">Progreso</p>
     <h2 class="h-big" style="font-size:24px">Camino al nivel intermedio</h2>
+    ${progTabsHTML()}
     <p class="eyebrow" style="margin-top:14px">Todos los movimientos</p>
     ${overviewHTML()}
     <hr class="sep">
@@ -1364,6 +1423,7 @@ function renderProgreso(){
     </div>
     <p class="tiny center" style="margin-top:2px">Toca o arrastra la gráfica para ver cada valor · usa +/− para acercar</p>
     <div id="pstats" style="margin-top:14px"></div>`;
+  wireProgTabs();
   document.querySelectorAll('#pick button').forEach(b=>b.onclick=()=>{ progLift=b.dataset.k; chartWin=null; chartEnd=null; renderProgreso(); });
   document.querySelectorAll('[data-ovk]').forEach(r=>r.onclick=()=>{ progLift=r.dataset.ovk; chartWin=null; chartEnd=null; renderProgreso(); });
   const d=progData();
@@ -2113,6 +2173,475 @@ function drawBodyChart(cardio, metricOverride, svgId, tipId){
 }
 
 /* ---- AJUSTES ---- */
+/* ============================================================
+   FASE II — Rutina dividida torso-pierna, periodización ondulante
+   (fiel al libro: días de fuerza 3-5 reps, hipertrofia 8-15 reps,
+    potencia+HIIT, progresión SEMANAL por doble progresión)
+   ============================================================ */
+const F2_DAYS = [
+  { id:'tf', name:'Torso · Fuerza', tipo:'fuerza', rest:150, page:183, ex:[
+    {k:'banca',    label:'Press banca',            sets:3, rMin:3, rMax:5, kind:'carga'},
+    {k:'militar',  label:'Press militar',          sets:3, rMin:3, rMax:5, kind:'carga'},
+    {k:'remo',     label:'Remo con barra',         sets:3, rMin:3, rMax:5, kind:'carga'},
+    {k:'jabalina', label:'Press jabalina',         sets:3, rMin:3, rMax:5, kind:'carga', perSide:true},
+    {k:'domProno', label:'Dominadas (chin-up)',    sets:3, rMin:5, rMax:8, kind:'lastre'},
+    {k:'fondos',   label:'Fondos en paralelas',    sets:3, rMin:5, rMax:8, kind:'lastre'},
+    {k:'encog',    label:'Encogimientos',          sets:2, rMin:8, rMax:10, kind:'carga', extra:true}
+  ]},
+  { id:'pf', name:'Pierna · Fuerza', tipo:'fuerza', rest:180, page:183, ex:[
+    {k:'sentadilla',   label:'Sentadilla',                       sets:3, rMin:3, rMax:5, kind:'carga'},
+    {k:'peso_muerto',  label:'Peso muerto',                      sets:3, rMin:3, rMax:5, kind:'carga'},
+    {k:'elevPiernas',  label:'Elevaciones de piernas a la barra',sets:3, rMin:8, rMax:10, kind:'pc'},
+    {k:'situpBarra',   label:'Sit-up con barra',                 sets:3, rMin:5, rMax:5, kind:'carga'},
+    {k:'sentUnaPierna',label:'Sentadilla a una pierna (sin peso)',sets:2, rMin:5, rMax:5, kind:'pc', perSide:true, extra:true}
+  ]},
+  { id:'th', name:'Torso · Hipertrofia', tipo:'hiper', rest:90, page:184, ex:[
+    {k:'militarH',   label:'Press militar',        sets:4, rMin:8,  rMax:10, kind:'carga'},
+    {k:'bancaH',     label:'Press banca',          sets:4, rMin:8,  rMax:10, kind:'carga'},
+    {k:'domSupino',  label:'Dominadas (pull-up) al fallo', sets:3, rMin:0, rMax:0, kind:'fallo'},
+    {k:'flexPalmada',label:'Flexiones con palmada', sets:4, rMin:15, rMax:15, kind:'pc'},
+    {k:'curlBarra',  label:'Curl con barra',       sets:4, rMin:10, rMax:12, kind:'carga'},
+    {k:'curlInv',    label:'Curl invertido',       sets:2, rMin:10, rMax:12, kind:'carga', extra:true}
+  ]},
+  { id:'ph', name:'Pierna · Hipertrofia', tipo:'hiper', rest:90, page:184, ex:[
+    {k:'sentFrontal',  label:'Sentadilla frontal',       sets:4, rMin:8, rMax:10, kind:'carga'},
+    {k:'rumano',       label:'Peso muerto rumano',       sets:4, rMin:8, rMax:10, kind:'carga'},
+    {k:'desplantes',   label:'Desplantes con barra',     sets:4, rMin:8, rMax:10, kind:'carga'},
+    {k:'talones',      label:'Elevación de talones',     sets:4, rMin:10, rMax:15, kind:'carga'},
+    {k:'rollout',      label:'Roll-out',                 sets:4, rMin:10, rMax:10, kind:'pc'},
+    {k:'pmUnilateral', label:'Peso muerto unilateral',   sets:2, rMin:6, rMax:8, kind:'carga', perSide:true, extra:true}
+  ]},
+  { id:'po', name:'Potencia + HIIT', tipo:'potencia', rest:180, page:185, optional:true, ex:[
+    {k:'clean', label:'Clean', sets:5, rMin:3, rMax:3, kind:'carga'}
+  ]}
+];
+// HIIT de Fase II (distintos de Fase I; todos por tiempo). Rotan por semana.
+const F2_HIIT = {
+  1:{tag:'HIIT 01', desc:'2 rondas · al menor tiempo posible',
+     items:['100 saltos de cuerda (o 100 zancadas)','40 sentadillas','30 abdominales','20 flexiones (pies elevados)','10 dominadas']},
+  2:{tag:'HIIT 02', desc:'3 rondas · al menor tiempo posible',
+     items:['40 desplantes (20 por pierna)','30 flexiones','30 sentadillas','30 burpees']},
+  3:{tag:'HIIT 03', desc:'4 rondas · 1 min de descanso entre rondas',
+     items:['10 swings','15 rodillas al pecho','10 dominadas','100 saltos de cuerda (o 100 zancadas)','5 renegade row (por lado)','20 flexiones']},
+  4:{tag:'HIIT 04', desc:'15-9-6 repeticiones de cada uno',
+     items:['Thruster','Flexión','Swing','Burpee']}
+};
+const F2_BIGLEG = ['sentadilla','peso_muerto','sentFrontal','rumano'];
+function f2Inc(k){ return F2_BIGLEG.includes(k) ? 5 : 2.5; }
+// Tipo de rampa de calentamiento por ejercicio (los que no están = sin rampa: core/aislamiento)
+const F2_WU = { banca:'press', bancaH:'press', militar:'press', militarH:'press', remo:'press', jabalina:'press',
+  encog:'press', sentadilla:'squat', peso_muerto:'dead', sentFrontal:'squat', rumano:'dead', desplantes:'squat', clean:'press' };
+// Rampa de aproximación (fiel al libro: series incrementales antes de las efectivas)
+function f2Warmups(ex, w, tipo){
+  const t=F2_WU[ex.k]; if(!t || !(w>0) || ex.kind!=='carga') return [];
+  if(tipo==='fuerza') return warmups(w, t);               // rampa completa en días de fuerza
+  return [{r:'1×8', w:Math.max(20,floorTo(0.5*w,5))},{r:'1×5', w:Math.max(20,floorTo(0.7*w,5))}]; // hipertrofia: 1-2 de tanteo
+}
+// Claves de técnica + referencia de página (paráfrasis del libro) por ejercicio
+const F2_CUES = {
+  banca:{p:70,c:['Omóplatos juntos y hundidos en el banco.','Barra a la línea del pezón, codos ~45°.','Pies firmes, arco lumbar natural.','Bloquea arriba sin rebotar en el pecho.']},
+  bancaH:{p:184,c:['Más repes, menos peso: controla la bajada.','Si el banco es regulable, inclínalo en las 2 últimas series.','Descansos cortos (1-2 min): busca el bombeo.']},
+  militar:{p:75,c:['Barra sobre las clavículas, codos algo adelante.','Glúteos y abdomen apretados: sin arqueo lumbar.','Mete la cabeza al pasar la barra la frente.']},
+  militarH:{p:184,c:['Rango completo y tempo controlado.','Estricto, sin rebote de piernas.']},
+  remo:{p:183,c:['Cadera atrás, espalda neutra ~45°.','Tira hacia el bajo esternón/ombligo.','Aprieta escápulas arriba; baja controlado.','Sin tirones de lumbar.']},
+  jabalina:{p:184,c:['Barra en landmine; empuja arriba y adelante.','Un lado cada vez; core firme, sin rotar la cadera.','Sin landmine: mancuerna o kettlebell.']},
+  domProno:{p:183,c:['Agarre prono (palmas al frente).','Barbilla sobre la barra, sin balanceo.','Si pasas de las reps, añade lastre.']},
+  domSupino:{p:184,c:['Agarre supino (palmas hacia ti): más bíceps.','Al fallo real, pero con técnica limpia.']},
+  fondos:{p:183,c:['Hombros abajo; ligero adelanto del torso.','Baja a ~90° de codo; hombros lejos de las orejas.','Si pasas las reps, añade lastre.']},
+  encog:{p:184,c:['Solo suben los hombros (trapecio), no gires.','Pausa arriba 1 s; sin impulso.']},
+  elevPiernas:{p:183,c:['Colgado de la barra, sube piernas o rodillas.','Controla la bajada; evita el balanceo.']},
+  situpBarra:{p:183,c:['Sit-up completo con barra ligera al pecho.','Baja vértebra a vértebra.']},
+  sentUnaPierna:{p:184,c:['Sin peso, a una pierna; baja controlado.','Apóyate si hace falta; progresa en rango.']},
+  curlBarra:{p:184,c:['Codos pegados; sin balanceo lumbar.','Sube controlado, aprieta arriba, baja lento.']},
+  curlInv:{p:184,c:['Agarre pronado: antebrazo y braquial.','Muñecas firmes, sin tirones.']},
+  flexPalmada:{p:184,c:['Explosivo: empuja fuerte y palmada.','Si pasas de 15: mochila con peso o pies elevados.']},
+  sentFrontal:{p:184,c:['Barra en deltoides frontales, codos MUY altos.','Torso vertical; baja entre las rodillas.','Si molesta la muñeca, agarre cruzado.']},
+  rumano:{p:184,c:['Piernas casi rectas, cadera atrás.','Barra pegada; estira el femoral, no la lumbar.','Baja a media espinilla y sube con la cadera.']},
+  desplantes:{p:184,c:['Barra a la espalda; paso largo, rodilla casi al suelo.','Tronco erguido; empuja con el talón delantero.','8-10 por pierna.']},
+  talones:{p:184,c:['Rango completo: estira abajo, pausa arriba.','Controla, no rebotes.']},
+  rollout:{p:184,c:['Abdomen apretado todo el recorrido.','No arquees la lumbar; llega hasta donde controles.']},
+  sentadilla:{p:62,c:['Barra sobre el trapecio.','Rodillas hacia fuera; rompe paralelo.','Empuja todo el pie; pecho arriba.']},
+  peso_muerto:{p:66,c:['Barra pegada a la espinilla.','Espalda neutra, dorsales activos.','Cadera y hombros suben juntos.']},
+  clean:{p:77,c:['Tirón explosivo: cadera, rodilla y tobillo.','Recibe en cuarto de sentadilla, codos altos.','Técnica > peso; máxima velocidad.']}
+};
+function f2DayIdx(cur){ return ((cur-1)%5+5)%5; }
+function f2Week(cur){ return Math.floor((cur-1)/5)+1; }        // para rotar HIIT
+function f2Day(cur){ return F2_DAYS[f2DayIdx(cur)]; }
+function f2Logged(n){ return !!(S.f2.logs[n] && S.f2.logs[n].date); }
+
+// Última vez registrada que se hizo un día-tipo dado (para doble progresión)
+function f2LastOfDay(dayId, beforeN){
+  for(let n=beforeN-1;n>=1;n--){ const l=S.f2.logs[n]; if(l && l.date && l.dayId===dayId) return {n, l}; }
+  return null;
+}
+// Sugerencia de doble progresión para un ejercicio de carga
+function f2Suggest(day, ex){
+  const w = S.f2.weights[ex.k];
+  const prev = f2LastOfDay(day.id, S.f2.cur);
+  if(!prev || !prev.l.ex[ex.k]) return {w, hint:null, prevTxt:null};
+  const pe = prev.l.ex[ex.k];
+  const reps = (pe.sets||[]).map(s=>s.reps);
+  const prevW = pe.w;
+  const prevTxt = `${prevW!=null?prevW+' kg · ':''}${reps.join('·')}${pe.r?' · '+pe.r:''}${pe.esfuerzo?' · esf '+pe.esfuerzo+'/5':''}`;
+  // ¿batió el tope de repes en todas las series con ese peso?
+  const topeTodas = reps.length>=ex.sets && reps.every(r=>r>=ex.rMax);
+  if(ex.kind==='carga' && topeTodas && prevW!=null){
+    return {w: prevW + f2Inc(ex.k), hint:`¡Topaste ${ex.rMax} en todas! Sube a ${prevW+f2Inc(ex.k)} kg (vuelve a ${ex.rMin} reps)`, prevTxt, up:true};
+  }
+  return {w: (ex.kind==='carga'? prevW : w), hint: ex.rMax>ex.rMin?`Mismo peso: bate las reps (objetivo ${ex.rMax} en todas)`:`Supera tu marca anterior`, prevTxt};
+}
+
+/* ---------- GRADUACIÓN a Fase II ---------- */
+// Estima el 3RM de un lift de Fase I desde su peso de trabajo actual (5 reps) con Epley
+const EP5=1+5/30, EP3=1+3/30, EP8=1+8/30;
+function faseI_1RM(liftKey){
+  if(!LIFTS[liftKey]) return null;
+  const ns=nextAppearanceOf(liftKey);
+  const w=nearestLoadable(workWeight(liftKey, ns));   // peso de trabajo actual (~5RM)
+  return w>0 ? w*EP5 : null;
+}
+function est3RM(liftKey){ const o=faseI_1RM(liftKey); return o?nearestLoadable(o/EP3):null; }
+function est8RMfrom3(rm3){ return nearestLoadable(rm3*EP3/EP8); }  // 3RM -> 1RM -> 8RM
+function openGraduar(){
+  // pre-rellenar 3RM desde Fase I (datos reales); remo no existe en Fase I -> se deja vacío
+  const campos=[['sentadilla','Sentadilla'],['peso_muerto','Peso muerto'],['banca','Press banca'],['militar','Press militar'],['remo','Remo con barra']];
+  const pre={}; ['sentadilla','peso_muerto','banca','militar'].forEach(k=>{ pre[k]=est3RM(k); });
+  const ov=document.getElementById('grad-modal')||document.createElement('div');
+  ov.id='grad-modal'; ov.className='modal show';
+  ov.innerHTML=`<div class="modal-box deload-box">
+    <h3 class="dl-title" style="color:var(--accent)">Graduarse a Fase II</h3>
+    <p class="dl-intro">Dejas atrás la fase de novato. Ahora toca rutina <b>torso-pierna</b> con días de fuerza e hipertrofia. Tu Fase I queda guardada e intacta.<br><br>He <b>pre-rellenado tu 3RM</b> calculándolo desde tus pesos de Fase I (Epley). Revísalo y ajústalo si quieres. El <b>remo</b> no lo has hecho en Fase I: ponlo a ojo o déjalo para la 1ª sesión.</p>
+    <div class="calc-grid">
+      ${campos.map(([k,l])=>`<div class="field"><label>${l} · 3RM</label><input type="number" inputmode="decimal" id="g_${k}" value="${pre[k]??''}" placeholder="kg"></div>`).join('')}
+    </div>
+    <div class="note" style="font-size:12px;margin:4px 0 2px">Los días de hipertrofia (8RM) y los ejercicios nuevos (frontal, rumano, curl…) se siembran o se ajustan solos la primera vez.</div>
+    <div class="dl-btns" style="flex-direction:column">
+      <button class="btn" id="gradGo">Empezar Fase II</button>
+      <button class="btn ghost" id="gradCancel">Cancelar</button>
+    </div>
+    <p class="tiny" style="margin-top:8px">Podrás volver a Fase I cuando quieras en Ajustes (sin perder nada).</p>
+  </div>`;
+  if(!ov.parentElement) document.body.appendChild(ov);
+  ov.querySelector('#gradCancel').onclick=()=>ov.classList.remove('show');
+  ov.querySelector('#gradGo').onclick=()=>{
+    const g={}; campos.forEach(([k])=>{ const v=parseFloat(document.getElementById('g_'+k).value); if(v>0)g[k]=v; });
+    if(!g.sentadilla||!g.banca){ toast('Pon al menos sentadilla y banca'); return; }
+    S.f2 = { started:new Date().toISOString().slice(0,10), cur:1, logs:{}, weights:{}, hiit:{} };
+    const W=S.f2.weights;
+    // días de fuerza: peso = 3RM introducido
+    ['sentadilla','peso_muerto','banca','militar','remo'].forEach(k=>{ if(g[k]) W[k]=g[k]; });
+    // días de hipertrofia: 8RM derivado del 3RM (Epley)
+    if(g.banca)   W.bancaH   = est8RMfrom3(g.banca);
+    if(g.militar) W.militarH = est8RMfrom3(g.militar);
+    // ejercicios nuevos de pierna: estimación desde squat/DL 8RM (orientativa, ajustable)
+    if(g.sentadilla)  W.sentFrontal = nearestLoadable(est8RMfrom3(g.sentadilla)*0.85);
+    if(g.peso_muerto) W.rumano      = nearestLoadable(est8RMfrom3(g.peso_muerto)*0.65);
+    S.fase=2; save(); ov.classList.remove('show'); view='hoy'; hoyMode=null; render(); window.scrollTo(0,0);
+    toast('¡Bienvenido a Fase II! 💪');
+  };
+}
+function volverFaseI(){
+  askConfirm('¿Volver a Fase I? Tu progreso de Fase II se conserva; podrás retomarla luego.', ()=>{ S.fase=1; save(); view='hoy'; hoyMode=null; render(); toast('De vuelta en Fase I'); }, 'Volver');
+}
+/* ---- Selector de fase visible (arriba de Hoy). Nada se pierde al cambiar. ---- */
+function faseSwitcherHTML(){
+  const f2started = !!(S.f2 && S.f2.started);
+  return `<div class="fase-switch">
+    <button data-fase="1" class="${S.fase===1?'sel':''}">Fase I</button>
+    <button data-fase="2" class="${S.fase===2?'sel':''}">Fase II${f2started?'':' <span class="tiny">+</span>'}</button>
+  </div>
+  <p class="fase-note">Entrenando <b>Fase ${S.fase===2?'II':'I'}</b>. Cada fase guarda sus propios datos: cambia cuando quieras, no se borra nada. Mira cualquiera en <b>Historial</b> y <b>Progreso</b>.</p>`;
+}
+function wireFaseSwitcher(){
+  document.querySelectorAll('.fase-switch button').forEach(b=>b.onclick=()=>setFase(+b.dataset.fase));
+}
+function setFase(n){
+  if(n===S.fase) return;
+  if(n===2 && !(S.f2 && S.f2.started)){ openGraduar(); return; }  // primera vez: graduación guiada
+  const msg = n===2 ? 'Cambiar a entrenar Fase II. Tu Fase I queda guardada entera (la ves en Historial y Progreso).'
+                    : 'Volver a entrenar Fase I. Tu Fase II queda guardada entera (la ves en Historial y Progreso).';
+  askConfirm(msg, ()=>{ S.fase=n; save(); view='hoy'; hoyMode=null; render(); window.scrollTo(0,0); toast(n===2?'Entrenando Fase II':'Entrenando Fase I'); }, 'Cambiar');
+}
+
+/* ---------- HOY · Fase II ---------- */
+function renderHoyF2(){
+  const cur=S.f2.cur, day=f2Day(cur), wk=f2Week(cur);
+  const dayNum = f2DayIdx(cur)+1;
+  const log = S.f2.logs[cur] || {ex:{}};
+  app.innerHTML=`
+    <p class="eyebrow">Fase II · Semana ${wk} · Día ${dayNum}/5</p>
+    <h2 class="h-big" style="font-size:24px;margin-bottom:4px">${day.name}</h2>
+    <p class="sub">${day.tipo==='fuerza'?'Fuerza · 3-5 reps · descansa 2-3 min (máxima tensión)':day.tipo==='hiper'?'Hipertrofia · más reps, menos peso · descansa 1-2 min (estrés metabólico)':'Potencia máxima velocidad + acondicionamiento'}</p>
+    ${day.tipo!=='potencia'?warmupGeneralHTML():''}
+    <div id="f2lifts"></div>
+    ${day.tipo==='potencia'?'<div id="f2hiit"></div>':''}
+    <div class="btn-row">
+      <button class="btn ghost" id="f2Prev">‹ Anterior</button>
+      <button class="btn" id="f2Done">Completar día ›</button>
+    </div>
+    ${day.optional?'<button class="btn ghost" id="f2Skip" style="margin-top:8px">Saltar este día (opcional)</button>':''}
+    <p class="tiny center">Progresas por semana: primero más repes, y al topar el rango, más peso.</p>`;
+  const cont=document.getElementById('f2lifts');
+  day.ex.forEach(ex=>cont.appendChild(f2Card(day, ex, log)));
+  const wu=document.querySelector('.warmup-card .card-head'); if(wu) wu.onclick=()=>wu.parentElement.classList.toggle('open');
+  if(day.tipo==='potencia') document.getElementById('f2hiit').appendChild(f2HiitCard(cur, wk));
+  wireFaseSwitcher();
+  document.getElementById('f2Prev').onclick=()=>{ if(cur>1){ S.f2.cur--; save(); renderHoyF2(); window.scrollTo(0,0);} };
+  document.getElementById('f2Done').onclick=()=>f2Complete(day);
+  const sk=document.getElementById('f2Skip'); if(sk) sk.onclick=()=>{ S.f2.logs[cur]={date:new Date().toISOString().slice(0,10), dayId:day.id, skipped:true, ex:{}}; S.f2.cur++; save(); renderHoyF2(); window.scrollTo(0,0); toast('Día saltado'); };
+}
+
+function f2Card(day, ex, log){
+  const div=document.createElement('div'); div.className = ex.extra ? 'card' : 'card open';  // el extra arranca plegado (opcional)
+  const le = (log.ex && log.ex[ex.k]) || {};
+  const sug = (ex.kind==='carga') ? f2Suggest(day, ex) : {w:S.f2.weights[ex.k], hint:null, prevTxt:null};
+  const w = (le.w!=null)? le.w : sug.w;
+  const rango = ex.rMin===ex.rMax ? `${ex.sets}×${ex.rMax}` : `${ex.sets}×${ex.rMin}-${ex.rMax}`;
+  const needsW = ex.kind==='carga';
+  let head=`<div class="card-head"><div class="left"><span class="ex-name">${ex.label}${ex.perSide?' <span class="tiny">(por lado)</span>':''}${ex.extra?' <span class="opt-badge">Opcional</span>':''}</span></div>
+      <div style="display:flex;align-items:center;gap:8px"><span class="ex-scheme">${rango}${ex.kind==='fallo'?' · al fallo':''}</span><span class="chev">▶</span></div></div>`;
+  // fila de peso (editable) para ejercicios de carga; lastre para dominadas/fondos
+  let wRow='';
+  if(needsW){
+    wRow=`<div class="acc-input"><span>Peso de trabajo</span>
+      <input class="inline-num" type="number" inputmode="decimal" data-f2w="${ex.k}" value="${w??''}" placeholder="${ex.tipoHint||'kg'}" style="width:90px;text-align:left">
+      <span class="tiny">kg</span></div>`;
+  } else if(ex.kind==='lastre'){
+    wRow=`<div class="acc-input"><span>Lastre</span>
+      <input class="inline-num" type="number" inputmode="decimal" data-f2lastre="${ex.k}" value="${le.lastre??0}" placeholder="0" style="width:70px;text-align:left">
+      <span class="tiny">kg (0 = peso corporal)</span></div>`;
+  }
+  // reps por serie
+  const setsN = ex.sets;
+  const repInputs = Array.from({length:setsN},(_,i)=>`
+    <div class="f2set"><span class="f2set-l">S${i+1}</span>
+      <input class="inline-num" type="number" inputmode="numeric" data-f2rep="${ex.k}" data-i="${i}" value="${(le.sets&&le.sets[i]&&le.sets[i].reps)??''}" placeholder="${ex.kind==='fallo'?'máx':ex.rMax||'reps'}"></div>`).join('');
+  const prevLine = sug.prevTxt ? `<div class="prevline">${sug.up?'🔼 ':'🎯 '}Última vez: <b>${sug.prevTxt}</b>${sug.hint?` · ${sug.hint}`:''}</div>` : '';
+  // calentamiento por ejercicio (rampa de aproximación)
+  const wu = f2Warmups(ex, w, day.tipo);
+  const wuBlock = wu.length ? `<div class="f2wu"><span class="f2wu-t">Calentamiento (aprox.)</span>
+    ${wu.map(s=>`<div class="f2wu-s"><span>${s.r}</span><b>${s.w} kg</b></div>`).join('')}</div>` : '';
+  // claves de técnica + referencia al libro (como en Fase I)
+  const cu = F2_CUES[ex.k];
+  const help = cu ? `<div class="help"><b>Claves:</b> ${cu.c.join(' · ')}
+    <br><span class="pageref">📖 Barra Libre · pág. ${cu.p}</span></div>` : '';
+  const r=le.r||'limpio';
+  const outcomeBlock = `<div class="outcome3-wrap" style="margin-top:10px">
+      <span class="out-q">¿Cómo te fue?</span>
+      <div class="outcome3">
+        <button class="o3 ok ${r==='limpio'?'sel':''}" data-f2r="limpio" data-k="${ex.k}">✅ Limpio</button>
+        <button class="o3 mid ${r==='forzado'?'sel':''}" data-f2r="forzado" data-k="${ex.k}">🟡 Forzado</button>
+        <button class="o3 no ${r==='fallo'?'sel':''}" data-f2r="fallo" data-k="${ex.k}">❌ Fallo</button>
+      </div></div>
+    <div class="rir-wrap">
+      <span class="out-q">¿Cuánto te costó? <span class="tiny">(1 fácil · 5 al límite)</span></span>
+      <div class="rir">${[1,2,3,4,5].map(n=>`<button class="rir-b lvl${n} ${le.esfuerzo==n?'sel':''}" data-f2esf="${n}" data-k="${ex.k}">${n}</button>`).join('')}</div>
+    </div>`;
+  div.innerHTML=`${head}<div class="card-body">
+    ${ex.extra?'<div class="note" style="margin-bottom:8px">Ejercicio <b>opcional</b>: hazlo solo si acabas el día en 45-60 min y te sientes con energía. Si no, directo a la movilidad. 📖 pág. 184</div>':''}
+    ${prevLine}
+    ${wRow}
+    ${wuBlock}
+    <div class="f2sets-wrap"><span class="f2wu-t">Series efectivas</span><div class="f2sets">${repInputs}</div></div>
+    ${outcomeBlock}
+    ${help}
+    <div class="field" style="margin-top:8px"><label>Notas</label><input type="text" data-f2note="${ex.k}" value="${le.nota||''}" placeholder="Sensaciones, ajustes…"></div>
+  </div>`;
+  // outcome + esfuerzo (metadatos: la progresión la decide las reps)
+  div.querySelectorAll('[data-f2r]').forEach(b=>b.onclick=()=>{ const lg=f2EnsureLog(); lg.ex[ex.k]=lg.ex[ex.k]||{}; lg.ex[ex.k].r=b.dataset.f2r; save();
+    div.querySelectorAll('[data-f2r]').forEach(x=>x.classList.toggle('sel', x===b)); });
+  div.querySelectorAll('[data-f2esf]').forEach(b=>b.onclick=()=>{ const lg=f2EnsureLog(); lg.ex[ex.k]=lg.ex[ex.k]||{}; lg.ex[ex.k].esfuerzo=+b.dataset.f2esf; save();
+    div.querySelectorAll('[data-f2esf]').forEach(x=>x.classList.toggle('sel', x===b)); });
+  div.querySelector('.card-head').onclick=(e)=>{ if(!e.target.closest('input')) div.classList.toggle('open'); };
+  const wEl=div.querySelector('[data-f2w]'); if(wEl) wEl.addEventListener('change',e=>{ const v=parseFloat(e.target.value); if(v>0){ S.f2.weights[ex.k]=v; save();
+    const nb=f2Warmups(ex, v, day.tipo); const box=div.querySelector('.f2wu');
+    const html = nb.length?`<span class="f2wu-t">Calentamiento (aprox.)</span>${nb.map(s=>`<div class="f2wu-s"><span>${s.r}</span><b>${s.w} kg</b></div>`).join('')}`:'';
+    if(box) box.innerHTML=html; } });
+  return div;
+}
+
+function f2HiitCard(cur, wk){
+  const num=((wk-1)%4)+1, def=F2_HIIT[num];
+  const h = S.f2.hiit[cur] || {};
+  const div=document.createElement('div'); div.className='card open';
+  div.innerHTML=`<div class="card-head"><div class="left"><span class="ex-name" style="font-size:17px">${def.tag}</span></div><span class="ex-scheme">${def.desc.split('·')[0]}</span></div>
+    <div class="card-body">
+      <p class="tiny" style="color:var(--warm)">${def.desc}</p>
+      <ul style="margin:6px 0 10px;padding-left:18px;color:var(--text);font-size:14px;line-height:1.7">${def.items.map(x=>`<li>${x}</li>`).join('')}</ul>
+      <div class="acc-input"><span>Tiempo total</span><input class="inline-num" type="text" id="f2hiitres" value="${h.res||''}" placeholder="p. ej. 12:30" style="width:120px;text-align:left"></div>
+      <div class="note" style="margin-top:6px">Registra el tiempo. En Fase II el HIIT va por tiempo (📖 pág. 185-186).</div>
+    </div>`;
+  div.querySelector('.card-head').onclick=()=>div.classList.toggle('open');
+  div.querySelector('#f2hiitres').addEventListener('change',e=>{ S.f2.hiit[cur]={...(S.f2.hiit[cur]||{}), res:e.target.value, tag:def.tag}; save(); });
+  return div;
+}
+
+function f2EnsureLog(){ const cur=S.f2.cur; if(!S.f2.logs[cur]) S.f2.logs[cur]={dayId:f2Day(cur).id, ex:{}}; if(!S.f2.logs[cur].ex) S.f2.logs[cur].ex={}; return S.f2.logs[cur]; }
+function f2Complete(day){
+  const cur=S.f2.cur;
+  const prov = (S.f2.logs[cur] && S.f2.logs[cur].ex) || {};  // outcome/esfuerzo ya marcados
+  const exLog={};
+  let subio=[];
+  day.ex.forEach(ex=>{
+    const sets=[];
+    document.querySelectorAll(`[data-f2rep="${ex.k}"]`).forEach(inp=>{ const r=parseInt(inp.value); sets.push({reps:isNaN(r)?null:r}); });
+    const noteEl=document.querySelector(`[data-f2note="${ex.k}"]`); const nota=noteEl?noteEl.value.trim():'';
+    const rec={sets, nota};
+    const pv=prov[ex.k]||{}; if(pv.r) rec.r=pv.r; if(pv.esfuerzo) rec.esfuerzo=pv.esfuerzo;
+    if(ex.kind==='carga'){ rec.w = S.f2.weights[ex.k] ?? null; }
+    if(ex.kind==='lastre'){ const l=document.querySelector(`[data-f2lastre="${ex.k}"]`); rec.lastre = l? (parseFloat(l.value)||0) : 0; }
+    exLog[ex.k]=rec;
+    // doble progresión: si topó el rango en todas las series con carga, sube peso para la próxima
+    if(ex.kind==='carga' && rec.w!=null){
+      const reps=sets.map(s=>s.reps).filter(r=>r!=null);
+      if(reps.length>=ex.sets && reps.every(r=>r>=ex.rMax)){ S.f2.weights[ex.k]=rec.w + f2Inc(ex.k); subio.push(`${ex.label} → ${S.f2.weights[ex.k]} kg`); }
+    }
+  });
+  const hiit = S.f2.hiit[cur];
+  S.f2.logs[cur]={date:new Date().toISOString().slice(0,10), dayId:day.id, ex:exLog, hiit: hiit?hiit.res:null};
+  S.f2.cur++;
+  save();
+  const msg = subio.length ? `Día guardado. Subes peso la próxima:\n• ${subio.join('\n• ')}` : 'Día guardado. La próxima, a batir las reps.';
+  askConfirm(msg, ()=>{ renderHoyF2(); window.scrollTo(0,0); }, 'Siguiente');
+}
+
+/* ---------- PLAN · Fase II (semana tipo) ---------- */
+function renderCalendarioF2(){
+  const cur=S.f2.cur, idx=f2DayIdx(cur);
+  const semana=[['Lun','Torso · Fuerza'],['Mar','Pierna · Fuerza'],['Mié','Descanso'],['Jue','Torso · Hipertrofia'],['Vie','Pierna · Hipertrofia'],['Sáb','Potencia + HIIT'],['Dom','Descanso']];
+  const mapIdx=[0,1,-1,2,3,4,-1]; // día semana -> F2_DAYS idx (-1 descanso)
+  app.innerHTML=`<p class="eyebrow">Plan · Fase II</p>
+    <h2 class="h-big" style="font-size:24px">Tu semana</h2>
+    <div class="f2week">
+      ${semana.map(([d,n],i)=>{ const di=mapIdx[i]; const isNow=di===idx; const rest=di===-1;
+        return `<div class="f2wd ${rest?'rest':''} ${isNow?'now':''}"><span class="f2wd-d">${d}</span><span class="f2wd-n">${n}</span>${isNow?'<span class="f2wd-tag">HOY</span>':''}</div>`; }).join('')}
+    </div>
+    <div class="note" style="margin-top:14px">El <b>sábado (potencia + HIIT)</b> es el día flotante: si una semana no puedes, sáltalo sin penalización. Los 4 días núcleo (2 fuerza + 2 hipertrofia) son el programa.</div>
+    <p class="tiny center" style="margin-top:10px">Distribución orientativa; lo que manda es el orden de los días, no el día de la semana exacto.</p>
+    ${camino3HTML()}`;
+}
+// ¿Cuántas semanas llevas de Fase II? (por días completados / 4 núcleo por semana, y por fecha)
+function f2SemanasHechas(){
+  const done=Object.keys(S.f2.logs).filter(n=>S.f2.logs[n].date && !S.f2.logs[n].skipped).length;
+  let porFecha=0; if(S.f2.started){ porFecha=Math.floor(daysBetween(S.f2.started, todayIso())/7); }
+  return Math.max(Math.round(done/4), porFecha);
+}
+function camino3HTML(){
+  // Condición de grasa (libro: ≤12-13% para definición máxima)
+  let grasaLine, grasaOk=null;
+  const fo = (typeof fatOficial==='function') ? fatOficial(todayIso()) : null;
+  if(fo){ grasaOk = fo.val<=13; grasaLine = `<b>${fo.val}%</b> (${fo.src}) ${grasaOk?'🟢 ≤13%':'🔴 por encima de 13%'}`; }
+  else grasaLine = '<b>—</b> · mídete la grasa en <b>Cuerpo</b>';
+  const sem=f2SemanasHechas();
+  return `<div class="card" style="margin-top:18px"><div class="card-body" style="display:block;border:none">
+    <p class="eyebrow" style="margin-top:0">Camino a Fase III (definición)</p>
+    <p class="lead" style="font-size:13px">La Fase III es <b>opcional</b> y se hace para un momento concreto (verano). No hay un número fijo de sesiones: la Fase II <b>se alarga meses</b> —aquí sale el grueso de tu músculo y fuerza—, no la cortes antes de tiempo.</p>
+    <div class="stat-line">Llevas en Fase II<b>~${sem} ${sem===1?'semana':'semanas'}</b></div>
+    <p class="eyebrow" style="margin-top:14px">Condiciones para entrar (libro)</p>
+    <div class="c3"><span class="c3-n">1</span><div><b>Músculo suficiente.</b> Si aún estás lejos del volumen que quieres, alarga Fase II subiendo pesos. Si entras flaco de músculo, se verá el six-pack… y las costillas.</div></div>
+    <div class="c3"><span class="c3-n">2</span><div><b>Grasa ≤ 12-13%.</b> Tu grasa ahora: ${grasaLine}. ${grasaOk===false?'Sigue con definición ligera hasta bajar de ahí.':grasaOk===true?'Cumples el umbral de grasa.':''}</div></div>
+    <div class="c3"><span class="c3-n">3</span><div><b>Sin competición a la vista.</b> La Fase III te deja definido pero algo más débil; no la hagas si preparas una prueba deportiva.</div></div>
+    <div class="note" style="margin-top:10px">Si en Fase II ya estás contento con tu nivel de grasa, puedes <b>saltarte la Fase III</b> e ir a la IV (proporciones). La Fase III dura solo <b>4 semanas</b> (máx. +2) y no se repite hasta 10-12 meses después.</div>
+  </div></div>`;
+}
+
+/* ---------- HISTORIAL · Fase II (con acceso a Fase I) ---------- */
+let histTab='f2';
+function renderHistorialF2(){
+  const cont=()=>{ const c=document.getElementById('histbody'); c.innerHTML=''; if(histTab==='f1'){ histFaseIInto(c); } else { histFaseIIInto(c); } };
+  app.innerHTML=`<p class="eyebrow">Historial</p>
+    <h2 class="h-big" style="font-size:24px">Todo tu progreso</h2>
+    <div class="ntabs" id="htabs">
+      <button data-h="f2" class="${histTab==='f2'?'sel':''}">Fase II</button>
+      <button data-h="f1" class="${histTab==='f1'?'sel':''}">Fase I (archivo)</button>
+    </div>
+    <div id="histbody"></div>`;
+  document.querySelectorAll('#htabs button').forEach(b=>b.onclick=()=>{ histTab=b.dataset.h; renderHistorialF2(); });
+  cont();
+}
+// Vuelca el historial de Fase I (reutiliza las tarjetas existentes)
+function histFaseIInto(c){
+  const strength=Object.keys(S.logs).map(Number).filter(s=>S.logs[s].date).map(s=>({type:'fuerza', s, date:S.logs[s].date}));
+  const hiits=Object.keys(S.hiit).map(Number).filter(w=>S.hiit[w].done||S.hiit[w].date).map(w=>({type:'hiit', w, date:S.hiit[w].date||'', tag:S.hiit[w].tag||('HIIT 0'+hiitOfWeek(w)), res:hiitResumen(w)}));
+  const all=[...strength,...hiits].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if(!all.length){ c.innerHTML='<div class="note">No hay registros de Fase I.</div>'; return; }
+  all.forEach(it=>c.appendChild(it.type==='fuerza'?histStrength(it):histHiit(it)));
+}
+function histFaseIIInto(c){
+  const ns=Object.keys(S.f2.logs).map(Number).filter(n=>S.f2.logs[n].date).sort((a,b)=>b-a);
+  c.innerHTML = ns.length?ns.map(n=>{ const l=S.f2.logs[n]; const day=F2_DAYS.find(d=>d.id===l.dayId)||{name:'?'};
+      if(l.skipped) return `<div class="hist-row"><span class="hist-d">${formatEs(l.date)}</span><span>${day.name} · saltado</span></div>`;
+      const resumen=Object.keys(l.ex||{}).slice(0,3).map(k=>{ const e=l.ex[k]; const r=(e.sets||[]).map(s=>s.reps).filter(x=>x!=null).join('·'); return `${k} ${e.w!=null?e.w+'kg ':''}${r}`; }).join(' · ');
+      return `<div class="hist-row"><span class="hist-d">${formatEs(l.date)}</span><span>${day.name}<br><span class="tiny">${resumen}${l.hiit?` · HIIT ${l.hiit}`:''}</span></span></div>`;
+    }).join(''):'<div class="note">Aún no has completado ningún día de Fase II.</div>';
+}
+
+/* ---------- PROGRESO · Fase II (peso de trabajo por ejercicio) ---------- */
+// Historia de peso de trabajo de un ejercicio: Fase I (lifts comunes) + Fase II
+function f2LiftHistory(k){
+  const pts=[];
+  if(LIFTS[k]){ for(let s=1;s<=TOTAL_SESSIONS;s++){ if(appearsIn(LIFTS[k].day,s)&&sessionLogged(s)) pts.push({x:S.logs[s].date, y:nearestLoadable(workWeight(k,s)), ph:1}); } }
+  Object.keys(S.f2.logs).map(Number).sort((a,b)=>a-b).forEach(n=>{ const l=S.f2.logs[n]; if(!l.date||l.skipped) return; const e=l.ex&&l.ex[k]; if(e&&e.w!=null) pts.push({x:l.date, y:e.w, ph:2}); });
+  pts.sort((a,b)=>a.x.localeCompare(b.x));
+  return pts;
+}
+let progLiftF2=null;
+function renderProgresoF2(){
+  // ejercicios de carga con datos (F2 o histórico Fase I)
+  const lifts=[];
+  F2_DAYS.forEach(d=>d.ex.forEach(ex=>{ if(ex.kind!=='carga'||lifts.find(x=>x.k===ex.k)) return; const h=f2LiftHistory(ex.k); if(h.length||S.f2.weights[ex.k]!=null) lifts.push({k:ex.k, label:ex.label, tipo:d.tipo, n:h.length}); }));
+  if(!progLiftF2 || !lifts.find(l=>l.k===progLiftF2)) progLiftF2 = lifts[0] ? lifts[0].k : null;
+  const cur = lifts.find(l=>l.k===progLiftF2);
+  app.innerHTML=`<p class="eyebrow">Progreso</p>
+    <h2 class="h-big" style="font-size:24px">Fase II · avance por ejercicio</h2>
+    ${progTabsHTML()}
+    ${lifts.length?`
+      <div class="progress-pick" id="pickf2" style="margin-top:10px">
+        ${lifts.map(l=>`<button data-k="${l.k}" class="${l.k===progLiftF2?'sel':''}">${l.label}</button>`).join('')}
+      </div>
+      <div class="chart-wrap"><svg class="chart" id="f2chart" viewBox="0 0 344 236"></svg><div class="chart-tip" id="f2tip"></div></div>
+      <div class="chart-legend"><span class="lg-line fai"></span> Fase I <span class="lg-line off"></span> Fase II</div>
+      <div id="f2pstats" style="margin-top:12px"></div>`
+    :'<div class="note" style="margin-top:12px">Todavía no hay datos. Haz tu primer día en Hoy.</div>'}
+    <div class="note" style="margin-top:12px">La prueba de que ganas músculo: estos pesos suben y tus perímetros crecen (pestaña Cuerpo).</div>`;
+  wireProgTabs();
+  document.querySelectorAll('#pickf2 button').forEach(b=>b.onclick=()=>{ progLiftF2=b.dataset.k; renderProgresoF2(); });
+  if(cur){ f2DrawProgress(progLiftF2); }
+}
+// Gráfica temporal del peso de trabajo (Fase I tenue + Fase II naranja, con divisoria)
+function f2DrawProgress(k){
+  const svg=document.getElementById('f2chart'); if(!svg) return;
+  const pts=f2LiftHistory(k); const tip=document.getElementById('f2tip');
+  const stats=document.getElementById('f2pstats');
+  if(!pts.length){ svg.innerHTML=`<text x="172" y="118" fill="var(--faint)" font-size="11" text-anchor="middle" font-family="Inter,sans-serif">Sin datos</text>`; if(stats)stats.innerHTML=''; return; }
+  const x0=pts[0].x, x1=pts[pts.length-1].x, span=Math.max(1,daysDiff(x0,x1));
+  const ys=pts.map(p=>p.y); let yMin=Math.min(...ys), yMax=Math.max(...ys); const pad=(yMax-yMin)*0.1||2; yMin-=pad; yMax+=pad;
+  const VBW=344,VBH=236,mL=40,mR=14,mT=14,mB=24,pX0=mL,pX1=VBW-mR,pY0=mT,pY1=VBH-mB,pW=pX1-pX0,pH=pY1-pY0;
+  const X=iso=>pX0+pW*daysDiff(x0,iso)/span, Y=v=>pY1-pH*(v-yMin)/((yMax-yMin)||1);
+  let grid='';
+  for(let g=0;g<=4;g++){ const val=yMin+(yMax-yMin)*g/4, yy=Y(val).toFixed(1);
+    grid+=`<line x1="${pX0}" y1="${yy}" x2="${pX1}" y2="${yy}" stroke="var(--line)" stroke-width="0.7"/><text x="${pX0-5}" y="${(+yy+3).toFixed(1)}" fill="var(--faint)" font-size="9" text-anchor="end" font-family="Inter,sans-serif">${Math.round(val)}</text>`; }
+  const fmt=iso=>{ const d=new Date(iso); return d.toLocaleDateString('es-ES',{day:'numeric',month:'short'}); };
+  const xl=`<text x="${pX0}" y="${pY1+15}" fill="var(--faint)" font-size="9" text-anchor="start" font-family="Inter,sans-serif">${fmt(x0)}</text><text x="${pX1}" y="${pY1+15}" fill="var(--faint)" font-size="9" text-anchor="end" font-family="Inter,sans-serif">${fmt(x1)}</text>`;
+  const p1=pts.filter(p=>p.ph===1), p2=pts.filter(p=>p.ph===2);
+  const path=arr=>arr.map((p,i)=>`${i?'L':'M'}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(' ');
+  // puente entre fase I y II para que la línea no se corte
+  let bridge=''; if(p1.length&&p2.length){ bridge=`<path d="M${X(p1[p1.length-1].x).toFixed(1)},${Y(p1[p1.length-1].y).toFixed(1)} L${X(p2[0].x).toFixed(1)},${Y(p2[0].y).toFixed(1)}" fill="none" stroke="var(--faint)" stroke-width="1.4" stroke-dasharray="3 3" opacity=".6"/>`;
+    const dx=X(p2[0].x).toFixed(1); bridge+=`<line x1="${dx}" y1="${pY0}" x2="${dx}" y2="${pY1}" stroke="var(--accent)" stroke-width="0.8" stroke-dasharray="4 3" opacity=".4"/><text x="${dx}" y="${pY0+8}" fill="var(--accent)" font-size="8" text-anchor="middle" font-family="Inter,sans-serif">Fase II</text>`; }
+  const l1 = p1.length?`<path d="${path(p1)}" fill="none" stroke="var(--faint)" stroke-width="1.6" stroke-linejoin="round"/>`+p1.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="2" fill="var(--faint)"/>`).join(''):'';
+  const l2 = p2.length?`<path d="${path(p2)}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="round"/>`+p2.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="2.6" fill="var(--warm)"/>`).join(''):'';
+  svg.innerHTML=`${grid}${bridge}${l1}${l2}${xl}<line id="f2cross" x1="0" y1="${pY0}" x2="0" y2="${pY1}" stroke="var(--warm)" stroke-width="1" opacity="0"/>`;
+  const at=cx=>{ const r=svg.getBoundingClientRect(); const vx=(cx-r.left)/r.width*VBW; let best=pts[0],bd=1e9; pts.forEach(p=>{const d=Math.abs(X(p.x)-vx); if(d<bd){bd=d;best=p;}}); const cr=document.getElementById('f2cross'); if(cr){cr.setAttribute('x1',X(best.x));cr.setAttribute('x2',X(best.x));cr.setAttribute('opacity','.5');} if(tip){tip.innerHTML=`${fmt(best.x)} · <b>${best.y} kg</b> <span class="tiny">(F${best.ph})</span>`; tip.style.opacity='1'; tip.style.left=Math.min(80,Math.max(2,X(best.x)/VBW*100))+'%';} };
+  const hide=()=>{ const cr=document.getElementById('f2cross'); if(cr)cr.setAttribute('opacity','0'); if(tip)tip.style.opacity='0'; };
+  svg.onpointerdown=e=>at(e.clientX); svg.onpointermove=e=>{ if(e.buttons||e.pointerType==='touch') at(e.clientX); }; svg.onpointerup=hide; svg.onpointerleave=e=>{ if(!e.buttons) hide(); };
+  // stats
+  if(stats){ const ini=pts[0], fin=pts[pts.length-1]; const dif=+(fin.y-ini.y).toFixed(1);
+    stats.innerHTML=`<div class="stat-line">Peso actual<b>${fin.y} kg</b></div>
+      <div class="stat-line">Desde el inicio${p1.length?' (Fase I)':''}<b>${ini.y} kg</b></div>
+      <div class="stat-line">Progreso total<b>${dif>=0?'+':''}${dif} kg</b></div>
+      <div class="stat-line">Registros<b>${pts.length}</b></div>`; }
+}
+
 function renderAjustes(){
   app.innerHTML=`<p class="eyebrow">Ajustes</p>
     <h2 class="h-big" style="font-size:24px">Tus parámetros</h2>
@@ -2133,6 +2662,15 @@ function renderAjustes(){
         <input type="text" data-cfg="plates" value="${S.cfg.plates.join(', ')}"></div>
     </div></div>
     <button class="btn" id="saveCfg">Guardar cambios</button>
+    <div class="card" style="margin-top:14px"><div class="card-body" style="display:block;border:none">
+      <p class="eyebrow" style="margin-top:0">Fase del programa</p>
+      <div class="stat-line">Fase actual<b>${S.fase===2?'II · Torso-pierna':'I · Novatos'}</b></div>
+      ${S.fase===1
+        ? `<button class="btn" id="gradBtn" style="margin-top:10px">Graduarse a Fase II →</button>
+           <p class="tiny" style="margin-top:6px">Cuando domines los pesos de intermedio y vayas justo de recuperación. Tu Fase I se conserva.</p>`
+        : `<button class="btn ghost" id="backF1Btn" style="margin-top:10px">← Volver a Fase I</button>
+           <p class="tiny" style="margin-top:6px">Tu progreso de Fase II se conserva al cambiar.</p>`}
+    </div></div>
     <button class="btn ghost" id="restartBtn" style="margin-top:10px">↺ Volver a la Sesión 1 · Día A (mantiene pesos y ajustes)</button>
     <div class="btn-row">
       <button class="btn ghost" id="exportBtn">Exportar datos</button>
@@ -2156,6 +2694,8 @@ function renderAjustes(){
     save(); render(); toast('Cambios guardados');
   };
   document.getElementById('restartBtn').onclick=()=>{ askConfirm('¿Volver a empezar el programa? Se borran las sesiones y los HIIT registrados, pero se mantienen tus pesos y ajustes.', ()=>{ S.logs={}; S.hiit={}; S.current=1; save(); view='hoy'; render(); toast('Empiezas de nuevo · Sesión 1 · Día A'); }, 'Reiniciar'); };
+  const gb=document.getElementById('gradBtn'); if(gb) gb.onclick=openGraduar;
+  const bb=document.getElementById('backF1Btn'); if(bb) bb.onclick=volverFaseI;
   document.getElementById('resetBtn').onclick=()=>{ askConfirm('¿Borrar todo y empezar de cero? No se puede deshacer.', ()=>{ localStorage.removeItem(KEY); S=load(); if(!S.hiit)S.hiit={}; view='hoy'; render(); }, 'Reiniciar'); };
   document.getElementById('exportBtn').onclick=()=>{
     const data={ _app:'BarraLibre', _version:1, _exported:new Date().toISOString(), training:S, body:B };
@@ -2176,6 +2716,7 @@ function renderAjustes(){
         S=t; localStorage.setItem(KEY, JSON.stringify(S));
         if(d.body && d.body.config){ B=d.body; localStorage.setItem(KEY_BODY, JSON.stringify(B)); }
         if(!S.hiit)S.hiit={}; if(!S.cfg.nutri)S.cfg.nutri={};
+        if(!S.fase)S.fase=1; if(!S.f2)S.f2={started:null,cur:1,logs:{},weights:{},hiit:{}};
         view='hoy'; render(); toast('Datos restaurados');
       }, 'Restaurar');
     }catch(err){ toast('Archivo no válido'); } };
@@ -2227,7 +2768,7 @@ function askConfirm(msg, onYes, yesLabel='Borrar'){
   ov.onclick=(e)=>{ if(e.target===ov) close(); }; // tocar fuera = cancelar
 }
 
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{ view=b.dataset.view; render(); window.scrollTo(0,0); });
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{ view=b.dataset.view; if(view==='progreso')progView=S.fase; if(view==='historial')histTab=(S.fase===2?'f2':'f1'); render(); window.scrollTo(0,0); });
 document.getElementById('rest-skip').onclick=stopRest;
 
 render();
