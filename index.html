@@ -252,6 +252,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .c3-n{flex:none;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#160a02;font-family:'Barlow Condensed';font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px}
 .c3 b{color:var(--text)}
 .opt-badge{font-family:'Barlow Condensed';font-weight:700;font-size:10px;text-transform:uppercase;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:99px;padding:1px 7px;vertical-align:middle}
+.f2bar{margin:8px 0}
 /* HIIT: rejilla de repeticiones por ronda */
 .hiit-grid{display:grid;gap:6px;align-items:center}
 .hg-h{font-family:'Barlow Condensed';font-weight:700;font-size:12px;text-transform:uppercase;color:var(--muted);text-align:center}
@@ -2282,13 +2283,21 @@ function f2Suggest(day, ex){
   const pe = prev.l.ex[ex.k];
   const reps = (pe.sets||[]).map(s=>s.reps);
   const prevW = pe.w;
-  const prevTxt = `${prevW!=null?prevW+' kg · ':''}${reps.join('·')}${pe.r?' · '+pe.r:''}${pe.esfuerzo?' · esf '+pe.esfuerzo+'/5':''}`;
-  // ¿batió el tope de repes en todas las series con ese peso?
-  const topeTodas = reps.length>=ex.sets && reps.every(r=>r>=ex.rMax);
+  // prefijo según tipo: carga -> kg; lastre -> lastre; peso corporal/fallo -> solo reps
+  const pref = ex.kind==='carga' ? (prevW!=null?prevW+' kg · ':'')
+             : ex.kind==='lastre' ? `lastre ${pe.lastre??0} kg · `
+             : '';
+  const repsTxt = reps.filter(r=>r!=null).length ? reps.join('·')+' reps' : '—';
+  const prevTxt = `${pref}${repsTxt}${pe.r?' · '+pe.r:''}${pe.esfuerzo?' · esf '+pe.esfuerzo+'/5':''}`;
+  // ¿batió el tope de repes en todas las series con ese peso? (solo carga sube peso)
+  const topeTodas = reps.length>=ex.sets && reps.every(r=>r!=null && r>=ex.rMax);
   if(ex.kind==='carga' && topeTodas && prevW!=null){
     return {w: prevW + f2Inc(ex.k), hint:`¡Topaste ${ex.rMax} en todas! Sube a ${prevW+f2Inc(ex.k)} kg (vuelve a ${ex.rMin} reps)`, prevTxt, up:true};
   }
-  return {w: (ex.kind==='carga'? prevW : w), hint: ex.rMax>ex.rMin?`Mismo peso: bate las reps (objetivo ${ex.rMax} en todas)`:`Supera tu marca anterior`, prevTxt};
+  const hint = ex.kind==='fallo' ? 'Al fallo: supera tus repes anteriores'
+             : ex.rMax>ex.rMin ? `Bate las reps (objetivo ${ex.rMax} en todas)`
+             : 'Supera tu marca anterior';
+  return {w: (ex.kind==='carga'? prevW : w), hint, prevTxt};
 }
 
 /* ---------- GRADUACIÓN a Fase II ---------- */
@@ -2394,7 +2403,7 @@ function renderHoyF2(){
 function f2Card(day, ex, log){
   const div=document.createElement('div'); div.className = ex.extra ? 'card' : 'card open';  // el extra arranca plegado (opcional)
   const le = (log.ex && log.ex[ex.k]) || {};
-  const sug = (ex.kind==='carga') ? f2Suggest(day, ex) : {w:S.f2.weights[ex.k], hint:null, prevTxt:null};
+  const sug = f2Suggest(day, ex);  // "última vez" para TODOS los ejercicios (también dominadas, fondos, flexiones…)
   const w = (le.w!=null)? le.w : sug.w;
   const rango = ex.rMin===ex.rMax ? `${ex.sets}×${ex.rMax}` : `${ex.sets}×${ex.rMin}-${ex.rMax}`;
   const needsW = ex.kind==='carga';
@@ -2425,6 +2434,9 @@ function f2Card(day, ex, log){
   const cu = F2_CUES[ex.k];
   const help = cu ? `<div class="help"><b>Claves:</b> ${cu.c.join(' · ')}
     <br><span class="pageref">📖 Barra Libre · pág. ${cu.p}</span></div>` : '';
+  // dibujo de la barra con sus discos (solo barra normal: no en landmine/unilateral)
+  const showBar = needsW && !ex.perSide;
+  const barBlock = (showBar && w>0) ? `<div class="f2bar">${barbellHTML(nearestLoadable(w))}</div>` : '';
   const r=le.r||'limpio';
   const outcomeBlock = `<div class="outcome3-wrap" style="margin-top:10px">
       <span class="out-q">¿Cómo te fue?</span>
@@ -2441,6 +2453,7 @@ function f2Card(day, ex, log){
     ${ex.extra?'<div class="note" style="margin-bottom:8px">Ejercicio <b>opcional</b>: hazlo solo si acabas el día en 45-60 min y te sientes con energía. Si no, directo a la movilidad. 📖 pág. 184</div>':''}
     ${prevLine}
     ${wRow}
+    ${barBlock}
     ${wuBlock}
     <div class="f2sets-wrap"><span class="f2wu-t">Series efectivas</span><div class="f2sets">${repInputs}</div></div>
     ${outcomeBlock}
@@ -2456,7 +2469,17 @@ function f2Card(day, ex, log){
   const wEl=div.querySelector('[data-f2w]'); if(wEl) wEl.addEventListener('change',e=>{ const v=parseFloat(e.target.value); if(v>0){ S.f2.weights[ex.k]=v; save();
     const nb=f2Warmups(ex, v, day.tipo); const box=div.querySelector('.f2wu');
     const html = nb.length?`<span class="f2wu-t">Calentamiento (aprox.)</span>${nb.map(s=>`<div class="f2wu-s"><span>${s.r}</span><b>${s.w} kg</b></div>`).join('')}`:'';
-    if(box) box.innerHTML=html; } });
+    if(box) box.innerHTML=html;
+    const bar=div.querySelector('.f2bar'); if(bar && showBar) bar.innerHTML=barbellHTML(nearestLoadable(v)); } });
+  // Guardado AL VUELO de reps, lastre y notas: así puedes ir a otras pestañas y volver sin perder lo tecleado
+  div.querySelectorAll('[data-f2rep]').forEach(inp=>inp.addEventListener('input',()=>{
+    const lg=f2EnsureLog(); const e=lg.ex[ex.k]=lg.ex[ex.k]||{}; e.sets=e.sets||[];
+    const i=+inp.dataset.i, v=parseInt(inp.value); e.sets[i]={reps:isNaN(v)?null:v}; save();
+  }));
+  const laEl=div.querySelector('[data-f2lastre]'); if(laEl) laEl.addEventListener('input',()=>{
+    const lg=f2EnsureLog(); const e=lg.ex[ex.k]=lg.ex[ex.k]||{}; e.lastre=parseFloat(laEl.value)||0; save(); });
+  const noEl=div.querySelector('[data-f2note]'); if(noEl) noEl.addEventListener('input',()=>{
+    const lg=f2EnsureLog(); const e=lg.ex[ex.k]=lg.ex[ex.k]||{}; e.nota=noEl.value; save(); });
   return div;
 }
 
